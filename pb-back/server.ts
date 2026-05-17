@@ -3,9 +3,7 @@ import path from 'path';
 import cors from '@fastify/cors';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import apiRoutes from './routes/api.js';
 
 const app = fastify({ logger: true });
 
@@ -24,6 +22,9 @@ app.register(fastifyStatic, {
   root: path.join(process.cwd(), 'public'),
   prefix: '/',
 });
+
+app.register(apiRoutes, { prefix: '/api' });
+
 app.get('/chkserver', async (request, reply) => {
   return '서버 생성 완료!!!!';
 });

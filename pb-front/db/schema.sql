@@ -7,7 +7,7 @@
 -- 2. 폴더는 (project_id, owner_user_id) 조합으로 user별 소유. owner NULL이면
 --    "범용 폴더"(현재 모드)로 동작.
 -- 3. 프로젝트는 관리자(role='admin')가 생성, project_members 로 멤버 관리.
--- 4. ideas 는 task_id 또는 folder_id 둘 중 하나에만 속함 (CHECK 제약).
+-- 4. todos 는 task_id 또는 folder_id 둘 중 하나에만 속함 (CHECK 제약).
 -- 5. position 은 INT — 정렬 변경 시 가운데 끼워넣기를 위해 클라이언트에서
 --    충분히 띄워서(예: 1000, 2000, 3000) 발급 권장. 빽빽해지면 주기적 재정렬.
 -- 6. DATETIME(3) — 밀리초 정밀도. 프런트 Date.now()와 호환.
@@ -16,7 +16,7 @@
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS ideas;
+DROP TABLE IF EXISTS todos;
 DROP TABLE IF EXISTS folders;
 DROP TABLE IF EXISTS tasks;
 DROP TABLE IF EXISTS project_members;
@@ -134,13 +134,13 @@ CREATE TABLE folders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
--- ideas
+-- todos
 --   task_id 또는 folder_id 둘 중 정확히 하나만 채워짐.
 --   "이동" 은 row 의 task_id ↔ folder_id 를 토글하는 UPDATE 한 번으로 처리.
 --   assignee 는 자유 입력 텍스트. user 시스템 도입 시 assignee_user_id 컬럼
 --   추가하고 백필 → assignee 컬럼 deprecate 또는 보조 라벨로 유지.
 -- =============================================================================
-CREATE TABLE ideas (
+CREATE TABLE todos (
   id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   task_id         BIGINT UNSIGNED     NULL,
   folder_id       BIGINT UNSIGNED     NULL,
@@ -153,17 +153,17 @@ CREATE TABLE ideas (
   updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
                                   ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_ideas_task_pos (task_id, position),
-  KEY idx_ideas_folder_pos (folder_id, position),
-  KEY idx_ideas_created_by (created_by),
-  CONSTRAINT fk_ideas_task
+  KEY idx_todos_task_pos (task_id, position),
+  KEY idx_todos_folder_pos (folder_id, position),
+  KEY idx_todos_created_by (created_by),
+  CONSTRAINT fk_todos_task
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ideas_folder
+  CONSTRAINT fk_todos_folder
     FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ideas_created_by
+  CONSTRAINT fk_todos_created_by
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   -- 정확히 한 쪽에만 속해야 함
-  CONSTRAINT chk_ideas_exactly_one_parent CHECK (
+  CONSTRAINT chk_todos_exactly_one_parent CHECK (
     (task_id IS NOT NULL AND folder_id IS NULL)
     OR (task_id IS NULL AND folder_id IS NOT NULL)
   )
@@ -181,10 +181,10 @@ CREATE TABLE ideas (
 --    ALTER TABLE projects MODIFY created_by    BIGINT UNSIGNED NOT NULL;
 --    ALTER TABLE folders  MODIFY owner_user_id BIGINT UNSIGNED NOT NULL;
 --
--- 3) ideas.assignee 를 user FK 로 전환:
---    ALTER TABLE ideas ADD COLUMN assignee_user_id BIGINT UNSIGNED NULL AFTER assignee,
---      ADD KEY idx_ideas_assignee_user (assignee_user_id),
---      ADD CONSTRAINT fk_ideas_assignee_user
+-- 3) todos.assignee 를 user FK 로 전환:
+--    ALTER TABLE todos ADD COLUMN assignee_user_id BIGINT UNSIGNED NULL AFTER assignee,
+--      ADD KEY idx_todos_assignee_user (assignee_user_id),
+--      ADD CONSTRAINT fk_todos_assignee_user
 --        FOREIGN KEY (assignee_user_id) REFERENCES users(id) ON DELETE SET NULL;
 --    -- 백필: assignee 텍스트 → users 매핑 (이름/이메일 기반 수동 또는 스크립트)
 --    -- 검증 후 assignee 컬럼 DROP (또는 라벨용으로 유지)
