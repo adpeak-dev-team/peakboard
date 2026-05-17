@@ -1,0 +1,20 @@
+{
+  "name": "pb-back",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon server"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@fastify/cookie": "^8.0.0",
+    "@fastify/static": "^7.0.0",
+    "dotenv": "^10.0.0",
+    "fastify": "^4.0.0"
+  }
+}
