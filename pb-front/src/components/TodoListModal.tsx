@@ -1,5 +1,6 @@
 'use client';
 
+import { Plus } from 'lucide-react';
 import Modal from './Modal';
 import TodoListView from './TodoListView';
 import type { Todo } from '@/lib/types';
@@ -9,6 +10,7 @@ interface TodoListModalProps {
   taskTitle: string;
   todos: Todo[];
   onClose: () => void;
+  onAddTodo: () => void;
   onToggleStar: (todoId: string) => void;
   onUpdate: (
     todoId: string,
@@ -17,6 +19,7 @@ interface TodoListModalProps {
   onRequestDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
   onRequestMove: (todoId: string) => void;
+  onRequestCopy: (todoId: string) => void;
 }
 
 export default function TodoListModal({
@@ -24,28 +27,39 @@ export default function TodoListModal({
   taskTitle,
   todos,
   onClose,
+  onAddTodo,
   onToggleStar,
   onUpdate,
   onRequestDelete,
   onReorder,
   onRequestMove,
+  onRequestCopy,
 }: TodoListModalProps) {
   return (
-    <Modal open={open} title="할 일 리스트" onClose={onClose}>
+    <Modal open={open} title={taskTitle} onClose={onClose}>
       <div className="space-y-3">
-        <div className="text-xs text-gray-500">
-          작업: <span className="text-gray-700 font-medium">{taskTitle}</span>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onAddTodo}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            할 일 추가
+          </button>
         </div>
 
         <TodoListView
           todos={todos}
-          emptyText="아직 할 일이 없습니다. 작업 카드의 + 버튼으로 추가해보세요."
+          emptyText="아직 할 일이 없습니다."
           onToggleStar={onToggleStar}
           onUpdate={onUpdate}
           onDelete={onRequestDelete}
           onReorder={onReorder}
           onMove={onRequestMove}
+          onCopy={onRequestCopy}
           moveLabel="폴더로 이동"
+          copyLabel="폴더로 복사"
         />
 
         <div className="flex justify-end pt-2">

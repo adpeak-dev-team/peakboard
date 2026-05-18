@@ -4,7 +4,7 @@ import { sql_con } from '../../lib/db.js';
 
 interface FolderRow extends RowDataPacket {
   id: number | string;
-  project_id: number | string;
+  owner_user_id: number | string | null;
   name: string;
   position: number;
 }
@@ -24,39 +24,23 @@ function toFolderDTO(row: FolderRow): FolderDTO {
 }
 
 const folderRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Params: { projectId: string } }>(
-    '/projects/:projectId/folders',
-    async (request, reply) => {
-      const projectId = Number(request.params.projectId);
-      if (!Number.isInteger(projectId) || projectId <= 0) {
-        return reply.status(400).send({ resultMessage: '잘못된 projectId 입니다.' });
-      }
-
-      try {
-        const [rows] = await sql_con.promise().query<FolderRow[]>(
-          `SELECT id, project_id, name, position
-             FROM folders
-            WHERE project_id = ? AND owner_user_id IS NULL
-            ORDER BY position, id`,
-          [projectId]
-        );
-        return rows.map(toFolderDTO);
-      } catch (err) {
-        request.log.error(err);
-        return reply.status(500).send({ resultMessage: '폴더 목록 조회 실패' });
-      }
+  // owner_user_id 기준으로 조회. 현재는 users 미구현이므로 NULL(공유) 폴더 전체 반환.
+  fastify.get('/folders', async (request, reply) => {
+    try {
+      const [rows] = await sql_con.promise().query<FolderRow[]>(
+        `SELECT id, owner_user_id, name, position
+           FROM folders
+          WHERE owner_user_id IS NULL
+          ORDER BY position, id`
+      );
+      return rows.map(toFolderDTO);
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(500).send({ resultMessage: '폴더 목록 조회 실패' });
     }
-  );
+  });
 
-  fastify.post<{
-    Params: { projectId: string };
-    Body: { name?: unknown };
-  }>('/projects/:projectId/folders', async (request, reply) => {
-    const projectId = Number(request.params.projectId);
-    if (!Number.isInteger(projectId) || projectId <= 0) {
-      return reply.status(400).send({ resultMessage: '잘못된 projectId 입니다.' });
-    }
-
+  fastify.post<{ Body: { name?: unknown } }>('/folders', async (request, reply) => {
     const rawName = request.body?.name;
     const name = typeof rawName === 'string' ? rawName.trim() : '';
     if (!name) {
@@ -70,22 +54,16 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
       const [posRows] = await sql_con.promise().query<RowDataPacket[]>(
         `SELECT COALESCE(MAX(position), 0) AS maxPos
            FROM folders
-          WHERE project_id = ? AND owner_user_id IS NULL`,
-        [projectId]
+          WHERE owner_user_id IS NULL`
       );
       const nextPos = Number(posRows[0]?.maxPos ?? 0) + 1000;
 
       const [result] = await sql_con.promise().query<ResultSetHeader>(
-        `INSERT INTO folders (project_id, owner_user_id, name, position)
-         VALUES (?, NULL, ?, ?)`,
-        [projectId, name, nextPos]
+        `INSERT INTO folders (owner_user_id, name, position) VALUES (NULL, ?, ?)`,
+        [name, nextPos]
       );
 
-      const dto: FolderDTO = {
-        id: String(result.insertId),
-        name,
-        todos: [],
-      };
+      const dto: FolderDTO = { id: String(result.insertId), name, todos: [] };
       return reply.status(201).send(dto);
     } catch (err) {
       request.log.error(err);

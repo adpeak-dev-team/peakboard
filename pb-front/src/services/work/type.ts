@@ -41,7 +41,6 @@ export interface DeleteTaskInput {
 export type FolderDTO = Folder;
 
 export interface CreateFolderInput {
-  projectId: string;
   name: string;
 }
 
@@ -75,6 +74,7 @@ export interface CreateTodoInput {
 
 export interface UpdateTodoInput {
   todoId: string;
+  kind: 'task' | 'folder';
   patch: {
     title?: string;
     description?: string;
@@ -88,6 +88,7 @@ export interface UpdateTodoInput {
 
 export interface DeleteTodoInput {
   todoId: string;
+  kind: 'task' | 'folder';
 }
 
 export const workQueryKeys = {
@@ -96,9 +97,9 @@ export const workQueryKeys = {
   tasksAll: () => [...workQueryKeys.all, 'tasks'] as const,
   tasks: (projectId: string) => [...workQueryKeys.tasksAll(), projectId] as const,
   foldersAll: () => [...workQueryKeys.all, 'folders'] as const,
-  folders: (projectId: string) => [...workQueryKeys.foldersAll(), projectId] as const,
   todosAll: () => [...workQueryKeys.all, 'todos'] as const,
   todos: (projectId: string) => [...workQueryKeys.todosAll(), projectId] as const,
+  folderTodosAll: () => [...workQueryKeys.all, 'folderTodos'] as const,
 };
 
 export type { Folder, Project, Task, TaskStatus };

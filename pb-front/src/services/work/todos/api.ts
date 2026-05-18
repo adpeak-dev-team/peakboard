@@ -11,6 +11,11 @@ export async function fetchTodos(projectId: string): Promise<TodoDTO[]> {
   return data;
 }
 
+export async function fetchFolderTodos(): Promise<TodoDTO[]> {
+  const { data } = await apiClient.get<TodoDTO[]>('/todos/folders');
+  return data;
+}
+
 export async function createTodo(input: CreateTodoInput): Promise<TodoDTO> {
   const url =
     input.parent.kind === 'task'

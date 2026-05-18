@@ -54,11 +54,10 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
           `SELECT td.id, td.task_id, td.folder_id, td.title, td.description, td.assignee,
                   td.starred, td.position, td.created_at
              FROM todos td
-             LEFT JOIN tasks   t ON t.id = td.task_id
-             LEFT JOIN folders f ON f.id = td.folder_id
-            WHERE t.project_id = ? OR f.project_id = ?
-            ORDER BY td.position, td.id`,
-          [projectId, projectId]
+             INNER JOIN tasks t ON t.id = td.task_id
+            WHERE t.project_id = ?
+            ORDER BY td.task_id, td.position, td.id`,
+          [projectId]
         );
         return rows.map(toTodoDTO);
       } catch (err) {
@@ -67,6 +66,23 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
+
+  // 폴더 소속 todos 전체 조회 (폴더는 프로젝트와 독립)
+  fastify.get('/todos/folders', async (request, reply) => {
+    try {
+      const [rows] = await sql_con.promise().query<TodoRow[]>(
+        `SELECT id, task_id, folder_id, title, description, assignee,
+                starred, position, created_at
+           FROM todos
+          WHERE folder_id IS NOT NULL
+          ORDER BY folder_id, position, id`
+      );
+      return rows.map(toTodoDTO);
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(500).send({ resultMessage: '폴더 todos 조회 실패' });
+    }
+  });
 
   fastify.post<{
     Params: { taskId: string };

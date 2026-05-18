@@ -184,23 +184,21 @@ export default function Sidebar({
           })
         )}
 
-        {activeProjectId && (
-          <>
-            <div className="flex items-center justify-between px-3 pt-6 pb-1">
-              <p className="text-xs uppercase tracking-wider text-gray-500">폴더</p>
-              <button
-                type="button"
-                onClick={onAddFolder}
-                className="p-1 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
-                aria-label="폴더 추가"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {folders.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-gray-500">폴더가 없습니다.</p>
-            ) : (
-              folders.map((f) => {
+        <div className="flex items-center justify-between px-3 pt-6 pb-1">
+          <p className="text-xs uppercase tracking-wider text-gray-500">폴더</p>
+          <button
+            type="button"
+            onClick={onAddFolder}
+            className="p-1 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+            aria-label="폴더 추가"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {folders.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-gray-500">폴더가 없습니다.</p>
+        ) : (
+          folders.map((f) => {
                 const isEditing = editingId?.kind === 'folder' && editingId.id === f.id;
                 return (
                   <div
@@ -251,9 +249,7 @@ export default function Sidebar({
                     )}
                   </div>
                 );
-              })
-            )}
-          </>
+          })
         )}
       </nav>
 
