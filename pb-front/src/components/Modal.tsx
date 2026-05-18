@@ -37,7 +37,7 @@ export default function Modal({ open, title, onClose, children, width }: ModalPr
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-3">{children}</div>
       </div>
     </div>
   );
