@@ -14,6 +14,9 @@
 -- 7. utf8mb4 / utf8mb4_unicode_ci — 한글·이모지 안전.
 -- =============================================================================
 
+CREATE DATABASE peakboard DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;
+USE peakboard;
+
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS todos;

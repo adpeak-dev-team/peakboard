@@ -8,10 +8,13 @@ import apiRoutes from './routes/api.js';
 
 const app = fastify({ logger: true });
 
-const port = Number(process.env.PORT || 4000);
+const port = Number(process.env.PORT || 3050);
 
 app.register(cors, {
-  origin: true,
+  origin: [
+    'http://localhost:3030',
+    'http://frontend:3030',
+  ],
   credentials: true,
 });
 
