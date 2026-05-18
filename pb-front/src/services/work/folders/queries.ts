@@ -2,10 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchFolders } from './api';
 import { workQueryKeys } from '../type';
 
-export function useFoldersQuery(projectId: string | null) {
+export function useFoldersQuery() {
   return useQuery({
-    queryKey: projectId ? workQueryKeys.folders(projectId) : workQueryKeys.foldersAll(),
-    queryFn: () => fetchFolders(projectId as string),
-    enabled: !!projectId,
+    queryKey: workQueryKeys.foldersAll(),
+    queryFn: fetchFolders,
   });
 }

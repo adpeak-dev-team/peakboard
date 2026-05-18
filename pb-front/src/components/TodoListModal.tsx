@@ -17,6 +17,7 @@ interface TodoListModalProps {
   onRequestDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
   onRequestMove: (todoId: string) => void;
+  onRequestCopy: (todoId: string) => void;
 }
 
 export default function TodoListModal({
@@ -29,6 +30,7 @@ export default function TodoListModal({
   onRequestDelete,
   onReorder,
   onRequestMove,
+  onRequestCopy,
 }: TodoListModalProps) {
   return (
     <Modal open={open} title="할 일 리스트" onClose={onClose}>
@@ -45,7 +47,9 @@ export default function TodoListModal({
           onDelete={onRequestDelete}
           onReorder={onReorder}
           onMove={onRequestMove}
+          onCopy={onRequestCopy}
           moveLabel="폴더로 이동"
+          copyLabel="폴더로 복사"
         />
 
         <div className="flex justify-end pt-2">

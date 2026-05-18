@@ -48,7 +48,7 @@ import {
   useUpdateFolderMutation,
   useDeleteFolderMutation,
 } from '@/services/work/folders/mutations';
-import { useTodosQuery } from '@/services/work/todos/queries';
+import { useTodosQuery, useFolderTodosQuery } from '@/services/work/todos/queries';
 import {
   useCreateTodoMutation,
   useDeleteTodoMutation,
@@ -98,14 +98,14 @@ export default function PeakBoard() {
   }, [projectsQuery.data, activeProjectId]);
 
   const tasksQuery = useTasksQuery(activeProjectId);
-  const foldersQuery = useFoldersQuery(activeProjectId);
+  const foldersQuery = useFoldersQuery();
   const todosQuery = useTodosQuery(activeProjectId);
+  const folderTodosQuery = useFolderTodosQuery();
 
-  // todos를 parent 기준으로 그룹핑 (배치 fetch 후 클라이언트 group by)
-  const { todosByTaskId, todosByFolderId } = useMemo(() => {
+  const todosByTaskId = useMemo(() => {
     const byTask = new Map<string, Todo[]>();
-    const byFolder = new Map<string, Todo[]>();
     for (const t of todosQuery.data ?? []) {
+      if (!t.taskId) continue;
       const todo: Todo = {
         id: t.id,
         title: t.title,
@@ -114,18 +114,31 @@ export default function PeakBoard() {
         assignee: t.assignee,
         createdAt: t.createdAt,
       };
-      if (t.taskId) {
-        const list = byTask.get(t.taskId) ?? [];
-        list.push(todo);
-        byTask.set(t.taskId, list);
-      } else if (t.folderId) {
-        const list = byFolder.get(t.folderId) ?? [];
-        list.push(todo);
-        byFolder.set(t.folderId, list);
-      }
+      const list = byTask.get(t.taskId) ?? [];
+      list.push(todo);
+      byTask.set(t.taskId, list);
     }
-    return { todosByTaskId: byTask, todosByFolderId: byFolder };
+    return byTask;
   }, [todosQuery.data]);
+
+  const todosByFolderId = useMemo(() => {
+    const byFolder = new Map<string, Todo[]>();
+    for (const t of folderTodosQuery.data ?? []) {
+      if (!t.folderId) continue;
+      const todo: Todo = {
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        starred: t.starred,
+        assignee: t.assignee,
+        createdAt: t.createdAt,
+      };
+      const list = byFolder.get(t.folderId) ?? [];
+      list.push(todo);
+      byFolder.set(t.folderId, list);
+    }
+    return byFolder;
+  }, [folderTodosQuery.data]);
 
   const tasks: Task[] = useMemo(() => {
     return (tasksQuery.data ?? []).map((t) => ({
@@ -165,9 +178,9 @@ export default function PeakBoard() {
   const createTaskMutation = useCreateTaskMutation(activeProjectId);
   const updateTaskMutation = useUpdateTaskMutation(activeProjectId);
   const deleteTaskMutation = useDeleteTaskMutation(activeProjectId);
-  const createFolderMutation = useCreateFolderMutation(activeProjectId);
-  const updateFolderMutation = useUpdateFolderMutation(activeProjectId);
-  const deleteFolderMutation = useDeleteFolderMutation(activeProjectId);
+  const createFolderMutation = useCreateFolderMutation();
+  const updateFolderMutation = useUpdateFolderMutation();
+  const deleteFolderMutation = useDeleteFolderMutation();
   const createTodoMutation = useCreateTodoMutation(activeProjectId);
   const updateTodoMutation = useUpdateTodoMutation(activeProjectId);
   const deleteTodoMutation = useDeleteTodoMutation(activeProjectId);
@@ -186,6 +199,9 @@ export default function PeakBoard() {
     { source: TodoSource; todoId: string } | null
   >(null);
   const [movingTodo, setMovingTodo] = useState<
+    { source: TodoSource; todoId: string } | null
+  >(null);
+  const [copyingTodo, setCopyingTodo] = useState<
     { source: TodoSource; todoId: string } | null
   >(null);
 
@@ -272,9 +288,8 @@ export default function PeakBoard() {
 
   // ====== folder handlers (DB) ======
   const handleAddFolder = (name: string) => {
-    if (!activeProjectId) return;
     createFolderMutation.mutate(
-      { projectId: activeProjectId, name },
+      { name },
       {
         onError: (err) => {
           console.error('폴더 생성 실패:', err);
@@ -289,9 +304,8 @@ export default function PeakBoard() {
       { folderId },
       {
         onSuccess: () => {
-          if (!activeProjectId) return;
           // DB CASCADE 로 folder 의 todos 도 사라졌으니 캐시에서도 제거
-          qc.setQueryData<TodoDTO[]>(workQueryKeys.todos(activeProjectId), (prev) =>
+          qc.setQueryData<TodoDTO[]>(workQueryKeys.folderTodosAll(), (prev) =>
             prev ? prev.filter((t) => t.folderId !== folderId) : prev
           );
         },
@@ -324,12 +338,12 @@ export default function PeakBoard() {
   };
 
   const handleUpdateTodo = (
-    _source: TodoSource,
+    source: TodoSource,
     todoId: string,
-    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
+    patch: Partial<Pick<Todo, 'title' | 'assignee' | 'description'>>
   ) => {
     updateTodoMutation.mutate(
-      { todoId, patch },
+      { todoId, kind: source.kind, patch },
       {
         onError: (err) => {
           console.error('아이디어 수정 실패:', err);
@@ -339,9 +353,9 @@ export default function PeakBoard() {
     );
   };
 
-  const handleDeleteTodo = (_source: TodoSource, todoId: string) => {
+  const handleDeleteTodo = (source: TodoSource, todoId: string) => {
     deleteTodoMutation.mutate(
-      { todoId },
+      { todoId, kind: source.kind },
       {
         onError: (err) => {
           console.error('아이디어 삭제 실패:', err);
@@ -353,18 +367,25 @@ export default function PeakBoard() {
 
   // 순서 변경은 DB 미반영 (캐시만, 추후 개선 단계에서 batch position PATCH 처리)
   const handleReorderTodos = (source: TodoSource, orderedIds: string[]) => {
-    if (!activeProjectId) return;
-    qc.setQueryData<TodoDTO[]>(workQueryKeys.todos(activeProjectId), (prev) => {
-      if (!prev) return prev;
-      const parentKey: keyof TodoDTO = source.kind === 'task' ? 'taskId' : 'folderId';
-      const inScope = prev.filter((t) => t[parentKey] === source.id);
-      const outScope = prev.filter((t) => t[parentKey] !== source.id);
-      const byId = new Map(inScope.map((t) => [t.id, t]));
-      const reordered = orderedIds
-        .map((id) => byId.get(id))
-        .filter((t): t is TodoDTO => !!t);
-      return [...outScope, ...reordered];
-    });
+    if (source.kind === 'folder') {
+      qc.setQueryData<TodoDTO[]>(workQueryKeys.folderTodosAll(), (prev) => {
+        if (!prev) return prev;
+        const inScope = prev.filter((t) => t.folderId === source.id);
+        const outScope = prev.filter((t) => t.folderId !== source.id);
+        const byId = new Map(inScope.map((t) => [t.id, t]));
+        const reordered = orderedIds.map((id) => byId.get(id)).filter((t): t is TodoDTO => !!t);
+        return [...outScope, ...reordered];
+      });
+    } else if (activeProjectId) {
+      qc.setQueryData<TodoDTO[]>(workQueryKeys.todos(activeProjectId), (prev) => {
+        if (!prev) return prev;
+        const inScope = prev.filter((t) => t.taskId === source.id);
+        const outScope = prev.filter((t) => t.taskId !== source.id);
+        const byId = new Map(inScope.map((t) => [t.id, t]));
+        const reordered = orderedIds.map((id) => byId.get(id)).filter((t): t is TodoDTO => !!t);
+        return [...outScope, ...reordered];
+      });
+    }
   };
 
   const handleToggleTodoStar = (source: TodoSource, todoId: string) => {
@@ -373,7 +394,7 @@ export default function PeakBoard() {
       : todosByFolderId.get(source.id)?.find((t) => t.id === todoId);
     if (!current) return;
     updateTodoMutation.mutate(
-      { todoId, patch: { starred: !current.starred } },
+      { todoId, kind: source.kind, patch: { starred: !current.starred } },
       {
         onError: (err) => {
           console.error('별 표시 변경 실패:', err);
@@ -383,8 +404,34 @@ export default function PeakBoard() {
     );
   };
 
+  const handleCopyTodo = (
+    source: TodoSource,
+    todoId: string,
+    destination: TodoSource
+  ) => {
+    const list = source.kind === 'task'
+      ? todosByTaskId.get(source.id) ?? []
+      : todosByFolderId.get(source.id) ?? [];
+    const original = list.find((t) => t.id === todoId);
+    if (!original) return;
+    createTodoMutation.mutate(
+      {
+        parent: { kind: destination.kind, id: destination.id },
+        title: original.title,
+        assignee: original.assignee,
+        description: original.description,
+      },
+      {
+        onError: (err) => {
+          console.error('아이디어 복사 실패:', err);
+          alert('아이디어 복사에 실패했어요.');
+        },
+      }
+    );
+  };
+
   const handleMoveTodo = (
-    _source: TodoSource,
+    source: TodoSource,
     todoId: string,
     destination: TodoSource
   ) => {
@@ -393,7 +440,7 @@ export default function PeakBoard() {
         ? { taskId: destination.id, folderId: null }
         : { taskId: null, folderId: destination.id };
     updateTodoMutation.mutate(
-      { todoId, patch },
+      { todoId, kind: source.kind, patch },
       {
         onError: (err) => {
           console.error('아이디어 이동 실패:', err);
@@ -519,6 +566,22 @@ export default function PeakBoard() {
       ? todosByTaskId.get(movingTodo.source.id) ?? []
       : todosByFolderId.get(movingTodo.source.id) ?? [];
     return list.find((i) => i.id === movingTodo.todoId)?.title ?? '';
+  })();
+
+  const copyingTodoTargets: MoveTarget[] = useMemo(() => {
+    if (!copyingTodo) return [];
+    if (copyingTodo.source.kind === 'task') {
+      return folders.map((f) => ({ type: 'folder' as const, id: f.id, name: f.name }));
+    }
+    return tasks.map((t) => ({ type: 'task' as const, id: t.id, name: t.title }));
+  }, [copyingTodo, folders, tasks]);
+
+  const copyingTodoTitle = (() => {
+    if (!copyingTodo) return '';
+    const list = copyingTodo.source.kind === 'task'
+      ? todosByTaskId.get(copyingTodo.source.id) ?? []
+      : todosByFolderId.get(copyingTodo.source.id) ?? [];
+    return list.find((i) => i.id === copyingTodo.todoId)?.title ?? '';
   })();
 
   return (
@@ -699,6 +762,13 @@ export default function PeakBoard() {
             todoId,
           })
         }
+        onRequestCopy={(todoId) =>
+          viewingTaskId &&
+          setCopyingTodo({
+            source: { kind: 'task', id: viewingTaskId },
+            todoId,
+          })
+        }
       />
 
       <FolderModal
@@ -736,6 +806,13 @@ export default function PeakBoard() {
             todoId,
           })
         }
+        onRequestCopy={(todoId) =>
+          viewingFolderId &&
+          setCopyingTodo({
+            source: { kind: 'folder', id: viewingFolderId },
+            todoId,
+          })
+        }
         onDeleteFolder={() => viewingFolderId && setDeletingFolderId(viewingFolderId)}
       />
 
@@ -762,6 +839,24 @@ export default function PeakBoard() {
               : { kind: 'task', id: target.id };
           handleMoveTodo(movingTodo.source, movingTodo.todoId, destination);
           setMovingTodo(null);
+        }}
+      />
+
+      <MoveTodoModal
+        open={!!copyingTodo}
+        mode="copy"
+        todoTitle={copyingTodoTitle}
+        targets={copyingTodoTargets}
+        targetKind={copyingTodo?.source.kind === 'task' ? 'folder' : 'task'}
+        onClose={() => setCopyingTodo(null)}
+        onPick={(target) => {
+          if (!copyingTodo) return;
+          const destination: TodoSource =
+            target.type === 'folder'
+              ? { kind: 'folder', id: target.id }
+              : { kind: 'task', id: target.id };
+          handleCopyTodo(copyingTodo.source, copyingTodo.todoId, destination);
+          setCopyingTodo(null);
         }}
       />
 

@@ -4,7 +4,6 @@ import { sql_con } from '../../lib/db.js';
 
 interface FolderRow extends RowDataPacket {
   id: number | string;
-  project_id: number | string;
   name: string;
   position: number;
 }
@@ -16,83 +15,48 @@ export interface FolderDTO {
 }
 
 function toFolderDTO(row: FolderRow): FolderDTO {
-  return {
-    id: String(row.id),
-    name: row.name,
-    todos: [],
-  };
+  return { id: String(row.id), name: row.name, todos: [] };
 }
 
 const folderRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Params: { projectId: string } }>(
-    '/projects/:projectId/folders',
-    async (request, reply) => {
-      const projectId = Number(request.params.projectId);
-      if (!Number.isInteger(projectId) || projectId <= 0) {
-        return reply.status(400).send({ resultMessage: '잘못된 projectId 입니다.' });
-      }
-
-      try {
-        const [rows] = await sql_con.promise().query<FolderRow[]>(
-          `SELECT id, project_id, name, position
-             FROM folders
-            WHERE project_id = ? AND owner_user_id IS NULL
-            ORDER BY position, id`,
-          [projectId]
-        );
-        return rows.map(toFolderDTO);
-      } catch (err) {
-        request.log.error(err);
-        return reply.status(500).send({ resultMessage: '폴더 목록 조회 실패' });
-      }
+  // 전체 폴더 목록 (범용 모드: owner_user_id IS NULL)
+  fastify.get('/folders', async (request, reply) => {
+    try {
+      const [rows] = await sql_con.promise().query<FolderRow[]>(
+        `SELECT id, name, position FROM folders WHERE owner_user_id IS NULL ORDER BY position, id`
+      );
+      return rows.map(toFolderDTO);
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(500).send({ resultMessage: '폴더 목록 조회 실패' });
     }
-  );
+  });
 
-  fastify.post<{
-    Params: { projectId: string };
-    Body: { name?: unknown };
-  }>('/projects/:projectId/folders', async (request, reply) => {
-    const projectId = Number(request.params.projectId);
-    if (!Number.isInteger(projectId) || projectId <= 0) {
-      return reply.status(400).send({ resultMessage: '잘못된 projectId 입니다.' });
-    }
-
+  // 폴더 생성 (범용 모드: owner_user_id = NULL)
+  fastify.post<{ Body: { name?: unknown } }>('/folders', async (request, reply) => {
     const rawName = request.body?.name;
     const name = typeof rawName === 'string' ? rawName.trim() : '';
-    if (!name) {
-      return reply.status(400).send({ resultMessage: '폴더 이름이 필요합니다.' });
-    }
-    if (name.length > 100) {
-      return reply.status(400).send({ resultMessage: '폴더 이름은 100자 이하여야 합니다.' });
-    }
+    if (!name) return reply.status(400).send({ resultMessage: '폴더 이름이 필요합니다.' });
+    if (name.length > 100) return reply.status(400).send({ resultMessage: '폴더 이름은 100자 이하여야 합니다.' });
 
     try {
       const [posRows] = await sql_con.promise().query<RowDataPacket[]>(
-        `SELECT COALESCE(MAX(position), 0) AS maxPos
-           FROM folders
-          WHERE project_id = ? AND owner_user_id IS NULL`,
-        [projectId]
+        `SELECT COALESCE(MAX(position), 0) AS maxPos FROM folders WHERE owner_user_id IS NULL`
       );
       const nextPos = Number(posRows[0]?.maxPos ?? 0) + 1000;
 
       const [result] = await sql_con.promise().query<ResultSetHeader>(
-        `INSERT INTO folders (project_id, owner_user_id, name, position)
-         VALUES (?, NULL, ?, ?)`,
-        [projectId, name, nextPos]
+        `INSERT INTO folders (owner_user_id, name, position) VALUES (NULL, ?, ?)`,
+        [name, nextPos]
       );
-
-      const dto: FolderDTO = {
-        id: String(result.insertId),
-        name,
-        todos: [],
-      };
-      return reply.status(201).send(dto);
+      return reply.status(201).send({ id: String(result.insertId), name, todos: [] });
     } catch (err) {
       request.log.error(err);
       return reply.status(500).send({ resultMessage: '폴더 생성 실패' });
     }
   });
 
+  // 폴더 이름 수정
   fastify.patch<{ Params: { folderId: string }; Body: { name?: unknown } }>(
     '/folders/:folderId',
     async (request, reply) => {
@@ -119,12 +83,12 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  // 폴더 삭제 (todos CASCADE)
   fastify.delete<{ Params: { folderId: string } }>('/folders/:folderId', async (request, reply) => {
     const folderId = Number(request.params.folderId);
     if (!Number.isInteger(folderId) || folderId <= 0) {
       return reply.status(400).send({ resultMessage: '잘못된 folderId 입니다.' });
     }
-
     try {
       const [result] = await sql_con
         .promise()

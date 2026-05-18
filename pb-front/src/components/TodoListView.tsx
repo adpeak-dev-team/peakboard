@@ -30,7 +30,9 @@ export interface TodoListViewProps {
   onDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
   onMove: (todoId: string) => void;
+  onCopy: (todoId: string) => void;
   moveLabel?: string;
+  copyLabel?: string;
 }
 
 type Draft = { title: string; description: string; assignee: string };
@@ -46,6 +48,7 @@ interface TodoRowProps {
   isEditing: boolean;
   draft: Draft;
   moveLabel: string;
+  copyLabel: string;
   onChangeDraft: (patch: Partial<Draft>) => void;
   onToggleStar: () => void;
   onStartEdit: () => void;
@@ -53,6 +56,7 @@ interface TodoRowProps {
   onCancelEdit: () => void;
   onDelete: () => void;
   onMove: () => void;
+  onCopy: () => void;
 }
 
 function TodoRow({
@@ -60,6 +64,7 @@ function TodoRow({
   isEditing,
   draft,
   moveLabel,
+  copyLabel,
   onChangeDraft,
   onToggleStar,
   onStartEdit,
@@ -67,6 +72,7 @@ function TodoRow({
   onCancelEdit,
   onDelete,
   onMove,
+  onCopy,
 }: TodoRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: todo.id });
@@ -201,6 +207,13 @@ function TodoRow({
             >
               {moveLabel}
             </button>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="px-2 py-1 text-xs text-purple-500 hover:bg-purple-50 rounded"
+            >
+              {copyLabel}
+            </button>
           </>
         )}
       </div>
@@ -216,7 +229,9 @@ export default function TodoListView({
   onDelete,
   onReorder,
   onMove,
+  onCopy,
   moveLabel = '이동',
+  copyLabel = '복사',
 }: TodoListViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ title: '', description: '', assignee: '' });
@@ -267,6 +282,7 @@ export default function TodoListView({
               isEditing={editingId === todo.id}
               draft={draft}
               moveLabel={moveLabel}
+              copyLabel={copyLabel}
               onChangeDraft={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
               onToggleStar={() => onToggleStar(todo.id)}
               onStartEdit={() => startEdit(todo)}
@@ -274,6 +290,7 @@ export default function TodoListView({
               onCancelEdit={cancelEdit}
               onDelete={() => onDelete(todo.id)}
               onMove={() => onMove(todo.id)}
+              onCopy={() => onCopy(todo.id)}
             />
           ))}
         </ul>

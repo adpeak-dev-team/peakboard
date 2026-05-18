@@ -44,7 +44,6 @@ export function useDeleteProjectMutation() {
         prev ? prev.filter((p) => p.id !== variables.projectId) : prev
       );
       qc.removeQueries({ queryKey: workQueryKeys.tasks(variables.projectId) });
-      qc.removeQueries({ queryKey: workQueryKeys.folders(variables.projectId) });
       qc.removeQueries({ queryKey: workQueryKeys.todos(variables.projectId) });
     },
   });

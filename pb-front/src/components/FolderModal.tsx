@@ -19,6 +19,7 @@ interface FolderModalProps {
   onRequestDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
   onRequestMove: (todoId: string) => void;
+  onRequestCopy: (todoId: string) => void;
   onDeleteFolder: () => void;
 }
 
@@ -33,6 +34,7 @@ export default function FolderModal({
   onRequestDelete,
   onReorder,
   onRequestMove,
+  onRequestCopy,
   onDeleteFolder,
 }: FolderModalProps) {
   return (
@@ -61,7 +63,9 @@ export default function FolderModal({
           onDelete={onRequestDelete}
           onReorder={onReorder}
           onMove={onRequestMove}
+          onCopy={onRequestCopy}
           moveLabel="작업으로 이동"
+          copyLabel="작업으로 복사"
         />
 
         <div className="flex justify-between pt-2">
