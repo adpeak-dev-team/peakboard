@@ -16,11 +16,7 @@ export interface FolderDTO {
 }
 
 function toFolderDTO(row: FolderRow): FolderDTO {
-  return {
-    id: String(row.id),
-    name: row.name,
-    todos: [],
-  };
+  return { id: String(row.id), name: row.name, todos: [] };
 }
 
 const folderRoutes: FastifyPluginAsync = async (fastify) => {
@@ -43,12 +39,8 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Body: { name?: unknown } }>('/folders', async (request, reply) => {
     const rawName = request.body?.name;
     const name = typeof rawName === 'string' ? rawName.trim() : '';
-    if (!name) {
-      return reply.status(400).send({ resultMessage: '폴더 이름이 필요합니다.' });
-    }
-    if (name.length > 100) {
-      return reply.status(400).send({ resultMessage: '폴더 이름은 100자 이하여야 합니다.' });
-    }
+    if (!name) return reply.status(400).send({ resultMessage: '폴더 이름이 필요합니다.' });
+    if (name.length > 100) return reply.status(400).send({ resultMessage: '폴더 이름은 100자 이하여야 합니다.' });
 
     try {
       const [posRows] = await sql_con.promise().query<RowDataPacket[]>(
@@ -102,7 +94,6 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
     if (!Number.isInteger(folderId) || folderId <= 0) {
       return reply.status(400).send({ resultMessage: '잘못된 folderId 입니다.' });
     }
-
     try {
       const [result] = await sql_con
         .promise()

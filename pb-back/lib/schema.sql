@@ -112,14 +112,15 @@ CREATE TABLE tasks (
 
 -- =============================================================================
 -- folders
---   프로젝트와 독립된 전역 폴더. owner_user_id 로 user 별 소유.
---   users 미구현 구간에서는 owner_user_id = NULL (공유 범용).
---   users 구현 후 NOT NULL 로 ALTER 하고 per-user 격리 적용 예정.
---   동일 owner 아래 같은 이름 중복 불가 (owner NULL 은 MySQL NULL 다중
---   허용 정책으로 사실상 무제한 — users 적용 시 완전 적용됨).
+--   "개인 폴더" — owner_user_id 로 user 별 소유.
+--   범용 모드에서는 owner_user_id = NULL (모두 공유).
+--   같은 프로젝트 안에서 같은 user 가 같은 이름 폴더를 중복 생성 못 하도록
+--   유니크 키 (project_id, owner_user_id, name). owner NULL인 경우는
+--   MySQL NULL 다중 허용 정책에 따라 여러 NULL이 충돌하지 않음(원하면 OK).
 -- =============================================================================
 CREATE TABLE folders (
   id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id      BIGINT UNSIGNED NOT NULL,
   owner_user_id   BIGINT UNSIGNED     NULL,  -- 추후 NOT NULL 로 ALTER
   name            VARCHAR(100)    NOT NULL,
   position        INT             NOT NULL DEFAULT 0,

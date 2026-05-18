@@ -340,7 +340,7 @@ export default function PeakBoard() {
   const handleUpdateTodo = (
     source: TodoSource,
     todoId: string,
-    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
+    patch: Partial<Pick<Todo, 'title' | 'assignee' | 'description'>>
   ) => {
     updateTodoMutation.mutate(
       { todoId, kind: source.kind, patch },
@@ -404,26 +404,6 @@ export default function PeakBoard() {
     );
   };
 
-  const handleMoveTodo = (
-    source: TodoSource,
-    todoId: string,
-    destination: TodoSource
-  ) => {
-    const patch =
-      destination.kind === 'task'
-        ? { taskId: destination.id, folderId: null }
-        : { taskId: null, folderId: destination.id };
-    updateTodoMutation.mutate(
-      { todoId, kind: source.kind, patch },
-      {
-        onError: (err) => {
-          console.error('아이디어 이동 실패:', err);
-          alert('아이디어 이동에 실패했어요.');
-        },
-      }
-    );
-  };
-
   const handleCopyTodo = (
     source: TodoSource,
     todoId: string,
@@ -445,6 +425,26 @@ export default function PeakBoard() {
         onError: (err) => {
           console.error('아이디어 복사 실패:', err);
           alert('아이디어 복사에 실패했어요.');
+        },
+      }
+    );
+  };
+
+  const handleMoveTodo = (
+    source: TodoSource,
+    todoId: string,
+    destination: TodoSource
+  ) => {
+    const patch =
+      destination.kind === 'task'
+        ? { taskId: destination.id, folderId: null }
+        : { taskId: null, folderId: destination.id };
+    updateTodoMutation.mutate(
+      { todoId, kind: source.kind, patch },
+      {
+        onError: (err) => {
+          console.error('아이디어 이동 실패:', err);
+          alert('아이디어 이동에 실패했어요.');
         },
       }
     );
