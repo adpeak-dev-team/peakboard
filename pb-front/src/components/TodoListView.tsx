@@ -95,7 +95,7 @@ function TodoRow({
         <button
           type="button"
           {...listeners}
-          className="shrink-0 p-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"
+          className="shrink-0 p-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none"
           aria-label="드래그하여 순서 변경"
         >
           <GripVertical className="w-4 h-4" />

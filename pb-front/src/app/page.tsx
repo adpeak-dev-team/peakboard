@@ -614,7 +614,9 @@ export default function PeakBoard() {
           <div className="flex items-center gap-3">
             <button
               className="lg:hidden text-gray-600 hover:text-gray-900"
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => {
+                setSidebarOpen(true) 
+              }}
               aria-label="메뉴 열기"
             >
               <Menu className="w-5 h-5" />
