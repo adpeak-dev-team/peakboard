@@ -2,32 +2,32 @@
 
 import { Plus } from 'lucide-react';
 import Modal from './Modal';
-import IdeaListView from './IdeaListView';
-import type { Idea } from '@/lib/types';
+import TodoListView from './TodoListView';
+import type { Todo } from '@/lib/types';
 
 interface FolderModalProps {
   open: boolean;
   folderName: string;
-  ideas: Idea[];
+  todos: Todo[];
   onClose: () => void;
-  onAddIdea: () => void;
-  onToggleStar: (ideaId: string) => void;
+  onAddTodo: () => void;
+  onToggleStar: (todoId: string) => void;
   onUpdate: (
-    ideaId: string,
-    patch: Partial<Pick<Idea, 'title' | 'assignee'>>
+    todoId: string,
+    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
   ) => void;
-  onRequestDelete: (ideaId: string) => void;
+  onRequestDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
-  onRequestMove: (ideaId: string) => void;
+  onRequestMove: (todoId: string) => void;
   onDeleteFolder: () => void;
 }
 
 export default function FolderModal({
   open,
   folderName,
-  ideas,
+  todos,
   onClose,
-  onAddIdea,
+  onAddTodo,
   onToggleStar,
   onUpdate,
   onRequestDelete,
@@ -45,7 +45,7 @@ export default function FolderModal({
           </div>
           <button
             type="button"
-            onClick={onAddIdea}
+            onClick={onAddTodo}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -53,8 +53,8 @@ export default function FolderModal({
           </button>
         </div>
 
-        <IdeaListView
-          ideas={ideas}
+        <TodoListView
+          todos={todos}
           emptyText="아직 아이디어가 없습니다. 위의 추가 버튼으로 등록해보세요."
           onToggleStar={onToggleStar}
           onUpdate={onUpdate}

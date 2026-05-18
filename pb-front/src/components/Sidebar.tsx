@@ -138,7 +138,7 @@ export default function Sidebar({
                   <FolderIcon className="w-4 h-4 mr-2 shrink-0" />
                   <span className="truncate">{f.name}</span>
                   <span className="ml-auto text-xs text-gray-500">
-                    {f.ideas.length}
+                    {f.todos.length}
                   </span>
                 </button>
               ))

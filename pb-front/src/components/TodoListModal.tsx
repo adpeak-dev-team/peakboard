@@ -1,35 +1,35 @@
 'use client';
 
 import Modal from './Modal';
-import IdeaListView from './IdeaListView';
-import type { Idea } from '@/lib/types';
+import TodoListView from './TodoListView';
+import type { Todo } from '@/lib/types';
 
-interface IdeaListModalProps {
+interface TodoListModalProps {
   open: boolean;
   taskTitle: string;
-  ideas: Idea[];
+  todos: Todo[];
   onClose: () => void;
-  onToggleStar: (ideaId: string) => void;
+  onToggleStar: (todoId: string) => void;
   onUpdate: (
-    ideaId: string,
-    patch: Partial<Pick<Idea, 'title' | 'assignee'>>
+    todoId: string,
+    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
   ) => void;
-  onRequestDelete: (ideaId: string) => void;
+  onRequestDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
-  onRequestMove: (ideaId: string) => void;
+  onRequestMove: (todoId: string) => void;
 }
 
-export default function IdeaListModal({
+export default function TodoListModal({
   open,
   taskTitle,
-  ideas,
+  todos,
   onClose,
   onToggleStar,
   onUpdate,
   onRequestDelete,
   onReorder,
   onRequestMove,
-}: IdeaListModalProps) {
+}: TodoListModalProps) {
   return (
     <Modal open={open} title="아이디어 리스트" onClose={onClose}>
       <div className="space-y-3">
@@ -37,8 +37,8 @@ export default function IdeaListModal({
           작업: <span className="text-gray-700 font-medium">{taskTitle}</span>
         </div>
 
-        <IdeaListView
-          ideas={ideas}
+        <TodoListView
+          todos={todos}
           emptyText="아직 아이디어가 없습니다. 작업 카드의 + 버튼으로 추가해보세요."
           onToggleStar={onToggleStar}
           onUpdate={onUpdate}

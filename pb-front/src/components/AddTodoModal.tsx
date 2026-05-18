@@ -3,19 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 
-interface AddIdeaModalProps {
+interface AddTodoModalProps {
   open: boolean;
   taskTitle: string;
   onClose: () => void;
   onSubmit: (title: string, assignee: string) => void;
 }
 
-export default function AddIdeaModal({
+export default function AddTodoModal({
   open,
   taskTitle,
   onClose,
   onSubmit,
-}: AddIdeaModalProps) {
+}: AddTodoModalProps) {
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);

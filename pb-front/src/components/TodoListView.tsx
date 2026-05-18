@@ -17,19 +17,19 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Idea } from '@/lib/types';
+import type { Todo } from '@/lib/types';
 
-export interface IdeaListViewProps {
-  ideas: Idea[];
+export interface TodoListViewProps {
+  todos: Todo[];
   emptyText?: string;
-  onToggleStar: (ideaId: string) => void;
+  onToggleStar: (todoId: string) => void;
   onUpdate: (
-    ideaId: string,
-    patch: Partial<Pick<Idea, 'title' | 'assignee'>>
+    todoId: string,
+    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
   ) => void;
-  onDelete: (ideaId: string) => void;
+  onDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
-  onMove: (ideaId: string) => void;
+  onMove: (todoId: string) => void;
   moveLabel?: string;
 }
 
@@ -41,8 +41,8 @@ function formatCreatedAt(ts: number): string {
   )} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-interface IdeaRowProps {
-  idea: Idea;
+interface TodoRowProps {
+  todo: Todo;
   isEditing: boolean;
   draftTitle: string;
   draftAssignee: string;
@@ -56,8 +56,8 @@ interface IdeaRowProps {
   onMove: () => void;
 }
 
-function IdeaRow({
-  idea,
+function TodoRow({
+  todo,
   isEditing,
   draftTitle,
   draftAssignee,
@@ -69,7 +69,7 @@ function IdeaRow({
   onCancelEdit,
   onDelete,
   onMove,
-}: IdeaRowProps) {
+}: TodoRowProps) {
   const {
     attributes,
     listeners,
@@ -77,7 +77,7 @@ function IdeaRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: idea.id });
+  } = useSortable({ id: todo.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -106,15 +106,15 @@ function IdeaRow({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onToggleStar}
           className="shrink-0 p-1 rounded hover:bg-gray-100"
-          aria-label={idea.starred ? '별 해제' : '별 표시'}
+          aria-label={todo.starred ? '별 해제' : '별 표시'}
         >
           <Star
             className={`w-5 h-5 ${
-              idea.starred
+              todo.starred
                 ? 'text-yellow-400'
                 : 'text-gray-300 hover:text-gray-400'
             }`}
-            fill={idea.starred ? 'currentColor' : 'none'}
+            fill={todo.starred ? 'currentColor' : 'none'}
           />
         </button>
         {isEditing ? (
@@ -131,7 +131,7 @@ function IdeaRow({
           />
         ) : (
           <span className="text-sm text-gray-700 wrap-break-word flex-1 min-w-0">
-            {idea.title}
+            {todo.title}
           </span>
         )}
       </div>
@@ -146,10 +146,10 @@ function IdeaRow({
             className="px-2 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-32"
           />
         ) : (
-          <span>담당자: {idea.assignee || '-'}</span>
+          <span>담당자: {todo.assignee || '-'}</span>
         )}
         <span className="text-gray-300">|</span>
-        <span>등록일: {formatCreatedAt(idea.createdAt)}</span>
+        <span>등록일: {formatCreatedAt(todo.createdAt)}</span>
         {isEditing ? (
           <>
             <button
@@ -197,8 +197,8 @@ function IdeaRow({
   );
 }
 
-export default function IdeaListView({
-  ideas,
+export default function TodoListView({
+  todos,
   emptyText = '아직 아이디어가 없습니다.',
   onToggleStar,
   onUpdate,
@@ -206,7 +206,7 @@ export default function IdeaListView({
   onReorder,
   onMove,
   moveLabel = '이동',
-}: IdeaListViewProps) {
+}: TodoListViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ title: string; assignee: string }>({
     title: '',
@@ -217,34 +217,34 @@ export default function IdeaListView({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  const startEdit = (idea: Idea) => {
-    setEditingId(idea.id);
-    setDraft({ title: idea.title, assignee: idea.assignee });
+  const startEdit = (todo: Todo) => {
+    setEditingId(todo.id);
+    setDraft({ title: todo.title, assignee: todo.assignee });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
   };
 
-  const saveEdit = (ideaId: string) => {
+  const saveEdit = (todoId: string) => {
     const title = draft.title.trim();
     const assignee = draft.assignee.trim();
     if (!title) return;
-    onUpdate(ideaId, { title, assignee });
+    onUpdate(todoId, { title, assignee });
     setEditingId(null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIdx = ideas.findIndex((i) => i.id === active.id);
-    const newIdx = ideas.findIndex((i) => i.id === over.id);
+    const oldIdx = todos.findIndex((i) => i.id === active.id);
+    const newIdx = todos.findIndex((i) => i.id === over.id);
     if (oldIdx < 0 || newIdx < 0) return;
-    const reordered = arrayMove(ideas, oldIdx, newIdx).map((i) => i.id);
+    const reordered = arrayMove(todos, oldIdx, newIdx).map((i) => i.id);
     onReorder(reordered);
   };
 
-  if (ideas.length === 0) {
+  if (todos.length === 0) {
     return (
       <p className="text-sm text-gray-400 py-6 text-center">{emptyText}</p>
     );
@@ -257,27 +257,27 @@ export default function IdeaListView({
       onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={ideas.map((i) => i.id)}
+        items={todos.map((i) => i.id)}
         strategy={verticalListSortingStrategy}
       >
         <ul className="max-h-80 overflow-y-auto">
-          {ideas.map((idea) => (
-            <IdeaRow
-              key={idea.id}
-              idea={idea}
-              isEditing={editingId === idea.id}
+          {todos.map((todo) => (
+            <TodoRow
+              key={todo.id}
+              todo={todo}
+              isEditing={editingId === todo.id}
               draftTitle={draft.title}
               draftAssignee={draft.assignee}
               moveLabel={moveLabel}
               onChangeDraft={(patch) =>
                 setDraft((prev) => ({ ...prev, ...patch }))
               }
-              onToggleStar={() => onToggleStar(idea.id)}
-              onStartEdit={() => startEdit(idea)}
-              onSaveEdit={() => saveEdit(idea.id)}
+              onToggleStar={() => onToggleStar(todo.id)}
+              onStartEdit={() => startEdit(todo)}
+              onSaveEdit={() => saveEdit(todo.id)}
               onCancelEdit={cancelEdit}
-              onDelete={() => onDelete(idea.id)}
-              onMove={() => onMove(idea.id)}
+              onDelete={() => onDelete(todo.id)}
+              onMove={() => onMove(todo.id)}
             />
           ))}
         </ul>

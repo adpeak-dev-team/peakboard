@@ -7,23 +7,23 @@ export type MoveTarget =
   | { type: 'folder'; id: string; name: string }
   | { type: 'task'; id: string; name: string };
 
-interface MoveIdeaModalProps {
+interface MoveTodoModalProps {
   open: boolean;
-  ideaTitle: string;
+  todoTitle: string;
   targets: MoveTarget[];
   targetKind: 'folder' | 'task';
   onClose: () => void;
   onPick: (target: MoveTarget) => void;
 }
 
-export default function MoveIdeaModal({
+export default function MoveTodoModal({
   open,
-  ideaTitle,
+  todoTitle,
   targets,
   targetKind,
   onClose,
   onPick,
-}: MoveIdeaModalProps) {
+}: MoveTodoModalProps) {
   const title =
     targetKind === 'folder' ? '폴더로 이동' : '작업으로 이동';
   const empty =
@@ -36,7 +36,7 @@ export default function MoveIdeaModal({
       <div className="space-y-3">
         <div className="text-xs text-gray-500">
           이동할 아이디어:{' '}
-          <span className="text-gray-700 font-medium">{ideaTitle}</span>
+          <span className="text-gray-700 font-medium">{todoTitle}</span>
         </div>
 
         {targets.length === 0 ? (

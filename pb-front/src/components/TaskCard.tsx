@@ -48,12 +48,12 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
     },
     ref
   ) {
-    const ideaCount = task.ideas.length;
-    const hasEmptyStar = ideaCount > 0 && task.ideas.some((i) => !i.starred);
+    const todoCount = task.todos.length;
+    const hasEmptyStar = todoCount > 0 && task.todos.some((i) => !i.starred);
 
     let statusIcon: React.ReactNode;
     let statusLabel: string;
-    if (ideaCount === 0) {
+    if (todoCount === 0) {
       statusIcon = <MinusCircle className="w-4 h-4 text-gray-400" />;
       statusLabel = '아이디어 없음';
     } else if (hasEmptyStar) {

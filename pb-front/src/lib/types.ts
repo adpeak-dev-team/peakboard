@@ -1,6 +1,6 @@
 export type TaskStatus = 'todo' | 'inProgress' | 'done';
 
-export interface Idea {
+export interface Todo {
   id: string;
   title: string;
   starred: boolean;
@@ -12,13 +12,13 @@ export interface Task {
   id: string;
   title: string;
   status: TaskStatus;
-  ideas: Idea[];
+  todos: Todo[];
 }
 
 export interface Folder {
   id: string;
   name: string;
-  ideas: Idea[];
+  todos: Todo[];
 }
 
 export interface Project {
