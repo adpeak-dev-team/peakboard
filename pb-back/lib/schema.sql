@@ -120,7 +120,7 @@ CREATE TABLE tasks (
 -- =============================================================================
 CREATE TABLE folders (
   id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  project_id      BIGINT UNSIGNED NOT NULL,
+  project_id      BIGINT UNSIGNED     NULL,  -- 범용 모드에서는 NULL. 추후 NOT NULL 로 ALTER
   owner_user_id   BIGINT UNSIGNED     NULL,  -- 추후 NOT NULL 로 ALTER
   name            VARCHAR(100)    NOT NULL,
   position        INT             NOT NULL DEFAULT 0,

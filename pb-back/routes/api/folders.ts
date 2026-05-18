@@ -58,6 +58,9 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
       const dto: FolderDTO = { id: String(result.insertId), name, todos: [] };
       return reply.status(201).send(dto);
     } catch (err) {
+      console.log('에러남!!');
+      console.error(err);
+      
       request.log.error(err);
       return reply.status(500).send({ resultMessage: '폴더 생성 실패' });
     }
