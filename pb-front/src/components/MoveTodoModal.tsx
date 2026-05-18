@@ -35,7 +35,7 @@ export default function MoveTodoModal({
     <Modal open={open} title={title} onClose={onClose}>
       <div className="space-y-3">
         <div className="text-xs text-gray-500">
-          이동할 아이디어:{' '}
+          이동할 할 일:{' '}
           <span className="text-gray-700 font-medium">{todoTitle}</span>
         </div>
 

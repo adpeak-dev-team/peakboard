@@ -3,6 +3,7 @@ export type TaskStatus = 'todo' | 'inProgress' | 'done';
 export interface Todo {
   id: string;
   title: string;
+  description: string;
   starred: boolean;
   assignee: string;
   createdAt: number;

@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createFolder, deleteFolder } from './api';
+import { createFolder, updateFolder, deleteFolder } from './api';
 import {
   workQueryKeys,
   type CreateFolderInput,
+  type UpdateFolderInput,
   type DeleteFolderInput,
   type FolderDTO,
 } from '../type';
@@ -16,6 +17,20 @@ export function useCreateFolderMutation(projectId: string | null) {
       if (!projectId) return;
       qc.setQueryData<FolderDTO[]>(workQueryKeys.folders(projectId), (prev) =>
         prev ? [...prev, created] : [created]
+      );
+    },
+  });
+}
+
+export function useUpdateFolderMutation(projectId: string | null) {
+  const qc = useQueryClient();
+
+  return useMutation<FolderDTO, Error, UpdateFolderInput>({
+    mutationFn: updateFolder,
+    onSuccess: (updated) => {
+      if (!projectId) return;
+      qc.setQueryData<FolderDTO[]>(workQueryKeys.folders(projectId), (prev) =>
+        prev ? prev.map((f) => (f.id === updated.id ? { ...f, name: updated.name } : f)) : prev
       );
     },
   });

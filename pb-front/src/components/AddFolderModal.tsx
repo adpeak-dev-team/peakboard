@@ -38,7 +38,6 @@ export default function AddFolderModal({ open, onClose, onSubmit }: AddFolderMod
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예: 미진행 아이디어 보관함"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
           />
         </div>

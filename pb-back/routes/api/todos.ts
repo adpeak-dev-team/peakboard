@@ -7,6 +7,7 @@ interface TodoRow extends RowDataPacket {
   task_id: number | string | null;
   folder_id: number | string | null;
   title: string;
+  description: string | null;
   assignee: string;
   starred: number;
   position: number;
@@ -18,6 +19,7 @@ export interface TodoDTO {
   taskId: string | null;
   folderId: string | null;
   title: string;
+  description: string;
   assignee: string;
   starred: boolean;
   position: number;
@@ -30,6 +32,7 @@ function toTodoDTO(row: TodoRow): TodoDTO {
     taskId: row.task_id == null ? null : String(row.task_id),
     folderId: row.folder_id == null ? null : String(row.folder_id),
     title: row.title,
+    description: row.description ?? '',
     assignee: row.assignee ?? '',
     starred: row.starred === 1,
     position: row.position,
@@ -38,7 +41,6 @@ function toTodoDTO(row: TodoRow): TodoDTO {
 }
 
 const todoRoutes: FastifyPluginAsync = async (fastify) => {
-  // 배치: 한 프로젝트의 모든 todos (task/folder 양쪽)
   fastify.get<{ Params: { projectId: string } }>(
     '/projects/:projectId/todos',
     async (request, reply) => {
@@ -49,8 +51,8 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         const [rows] = await sql_con.promise().query<TodoRow[]>(
-          `SELECT td.id, td.task_id, td.folder_id, td.title, td.assignee, td.starred,
-                  td.position, td.created_at
+          `SELECT td.id, td.task_id, td.folder_id, td.title, td.description, td.assignee,
+                  td.starred, td.position, td.created_at
              FROM todos td
              LEFT JOIN tasks   t ON t.id = td.task_id
              LEFT JOIN folders f ON f.id = td.folder_id
@@ -66,10 +68,9 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // task 에 추가
   fastify.post<{
     Params: { taskId: string };
-    Body: { title?: unknown; assignee?: unknown };
+    Body: { title?: unknown; description?: unknown; assignee?: unknown };
   }>('/tasks/:taskId/todos', async (request, reply) => {
     const taskId = Number(request.params.taskId);
     if (!Number.isInteger(taskId) || taskId <= 0) {
@@ -78,10 +79,9 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
     return createTodo(request, reply, { taskId, folderId: null });
   });
 
-  // folder 에 추가
   fastify.post<{
     Params: { folderId: string };
-    Body: { title?: unknown; assignee?: unknown };
+    Body: { title?: unknown; description?: unknown; assignee?: unknown };
   }>('/folders/:folderId/todos', async (request, reply) => {
     const folderId = Number(request.params.folderId);
     if (!Number.isInteger(folderId) || folderId <= 0) {
@@ -94,6 +94,7 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
     Params: { todoId: string };
     Body: {
       title?: unknown;
+      description?: unknown;
       assignee?: unknown;
       starred?: unknown;
       position?: unknown;
@@ -117,6 +118,10 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
       sets.push('title = ?');
       params.push(title);
     }
+    if (typeof body.description === 'string') {
+      sets.push('description = ?');
+      params.push(body.description.trim() || null);
+    }
     if (typeof body.assignee === 'string') {
       const assignee = body.assignee.trim();
       if (assignee.length > 100) return reply.status(400).send({ resultMessage: '담당자는 100자 이하' });
@@ -132,14 +137,11 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
       params.push(Math.trunc(body.position));
     }
 
-    // parent 이동: taskId/folderId 중 하나만 채워서 보내야 함
     const hasTaskId = 'taskId' in body;
     const hasFolderId = 'folderId' in body;
     if (hasTaskId || hasFolderId) {
-      const nextTaskId =
-        body.taskId == null ? null : Number(body.taskId);
-      const nextFolderId =
-        body.folderId == null ? null : Number(body.folderId);
+      const nextTaskId = body.taskId == null ? null : Number(body.taskId);
+      const nextFolderId = body.folderId == null ? null : Number(body.folderId);
 
       if (nextTaskId != null && nextFolderId != null) {
         return reply.status(400).send({ resultMessage: 'taskId / folderId 중 하나만 설정해야 합니다.' });
@@ -172,7 +174,7 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const [rows] = await sql_con.promise().query<TodoRow[]>(
-        `SELECT id, task_id, folder_id, title, assignee, starred, position, created_at
+        `SELECT id, task_id, folder_id, title, description, assignee, starred, position, created_at
            FROM todos WHERE id = ?`,
         [todoId]
       );
@@ -207,29 +209,25 @@ const todoRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-// 공통 INSERT 헬퍼 (task 또는 folder 한쪽만 채워서 호출)
 async function createTodo(
   request: FastifyRequest,
   reply: FastifyReply,
   parent: { taskId: number | null; folderId: number | null }
 ) {
-  const body = (request.body ?? {}) as { title?: unknown; assignee?: unknown };
+  const body = (request.body ?? {}) as { title?: unknown; description?: unknown; assignee?: unknown };
+
   const rawTitle = body.title;
   const title = typeof rawTitle === 'string' ? rawTitle.trim() : '';
-  if (!title) {
-    return reply.status(400).send({ resultMessage: 'todo 제목이 필요합니다.' });
-  }
-  if (title.length > 255) {
-    return reply.status(400).send({ resultMessage: '제목은 255자 이하여야 합니다.' });
-  }
+  if (!title) return reply.status(400).send({ resultMessage: 'todo 제목이 필요합니다.' });
+  if (title.length > 255) return reply.status(400).send({ resultMessage: '제목은 255자 이하여야 합니다.' });
+
+  const description = typeof body.description === 'string' ? body.description.trim() || null : null;
+
   const rawAssignee = body.assignee;
   const assignee = typeof rawAssignee === 'string' ? rawAssignee.trim() : '';
-  if (assignee.length > 100) {
-    return reply.status(400).send({ resultMessage: '담당자는 100자 이하여야 합니다.' });
-  }
+  if (assignee.length > 100) return reply.status(400).send({ resultMessage: '담당자는 100자 이하여야 합니다.' });
 
   try {
-    // 같은 부모(task or folder) 그룹의 max position
     const posQuery =
       parent.taskId != null
         ? 'SELECT COALESCE(MAX(position), 0) AS maxPos FROM todos WHERE task_id = ?'
@@ -239,13 +237,13 @@ async function createTodo(
     const nextPos = Number(posRows[0]?.maxPos ?? 0) + 1000;
 
     const [result] = await sql_con.promise().query<ResultSetHeader>(
-      `INSERT INTO todos (task_id, folder_id, title, assignee, starred, position)
-       VALUES (?, ?, ?, ?, 0, ?)`,
-      [parent.taskId, parent.folderId, title, assignee, nextPos]
+      `INSERT INTO todos (task_id, folder_id, title, description, assignee, starred, position)
+       VALUES (?, ?, ?, ?, ?, 0, ?)`,
+      [parent.taskId, parent.folderId, title, description, assignee, nextPos]
     );
 
     const [rows] = await sql_con.promise().query<TodoRow[]>(
-      `SELECT id, task_id, folder_id, title, assignee, starred, position, created_at
+      `SELECT id, task_id, folder_id, title, description, assignee, starred, position, created_at
          FROM todos WHERE id = ?`,
       [result.insertId]
     );

@@ -31,7 +31,7 @@ export default function TodoListModal({
   onRequestMove,
 }: TodoListModalProps) {
   return (
-    <Modal open={open} title="아이디어 리스트" onClose={onClose}>
+    <Modal open={open} title="할 일 리스트" onClose={onClose}>
       <div className="space-y-3">
         <div className="text-xs text-gray-500">
           작업: <span className="text-gray-700 font-medium">{taskTitle}</span>
@@ -39,7 +39,7 @@ export default function TodoListModal({
 
         <TodoListView
           todos={todos}
-          emptyText="아직 아이디어가 없습니다. 작업 카드의 + 버튼으로 추가해보세요."
+          emptyText="아직 할 일이 없습니다. 작업 카드의 + 버튼으로 추가해보세요."
           onToggleStar={onToggleStar}
           onUpdate={onUpdate}
           onDelete={onRequestDelete}

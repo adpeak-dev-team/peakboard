@@ -26,7 +26,7 @@ export default function Column({
 
   return (
     <div
-      className={`w-80 shrink-0 flex flex-col rounded-xl ${bgColor} p-4 max-h-full transition-colors ${
+      className={`w-full lg:w-80 lg:shrink-0 flex flex-col rounded-xl ${bgColor} p-4 max-h-full transition-colors ${
         isOver ? 'ring-2 ring-indigo-300' : ''
       }`}
     >

@@ -148,6 +148,7 @@ CREATE TABLE todos (
   task_id         BIGINT UNSIGNED     NULL,
   folder_id       BIGINT UNSIGNED     NULL,
   title           VARCHAR(255)    NOT NULL,
+  description     TEXT                NULL,
   assignee        VARCHAR(100)    NOT NULL DEFAULT '',  -- 자유 입력 (추후 FK 마이그레이션)
   starred         TINYINT(1)      NOT NULL DEFAULT 0,
   position        INT             NOT NULL DEFAULT 0,

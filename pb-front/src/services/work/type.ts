@@ -9,6 +9,15 @@ export interface CreateProjectInput {
   name: string;
 }
 
+export interface UpdateProjectInput {
+  projectId: string;
+  name: string;
+}
+
+export interface DeleteProjectInput {
+  projectId: string;
+}
+
 export type TaskDTO = Task;
 
 export interface CreateTaskInput {
@@ -40,11 +49,17 @@ export interface DeleteFolderInput {
   folderId: string;
 }
 
+export interface UpdateFolderInput {
+  folderId: string;
+  name: string;
+}
+
 export interface TodoDTO {
   id: string;
   taskId: string | null;
   folderId: string | null;
   title: string;
+  description: string;
   assignee: string;
   starred: boolean;
   position: number;
@@ -54,6 +69,7 @@ export interface TodoDTO {
 export interface CreateTodoInput {
   parent: { kind: 'task' | 'folder'; id: string };
   title: string;
+  description?: string;
   assignee: string;
 }
 
@@ -61,6 +77,7 @@ export interface UpdateTodoInput {
   todoId: string;
   patch: {
     title?: string;
+    description?: string;
     assignee?: string;
     starred?: boolean;
     position?: number;

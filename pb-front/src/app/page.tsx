@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Menu } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
@@ -31,7 +31,11 @@ import MoveTodoModal, { type MoveTarget } from '@/components/MoveTodoModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import type { Folder, Todo, Project, Task, TaskStatus } from '@/lib/types';
 import { useProjectsQuery } from '@/services/work/projects/queries';
-import { useCreateProjectMutation } from '@/services/work/projects/mutations';
+import {
+  useCreateProjectMutation,
+  useUpdateProjectMutation,
+  useDeleteProjectMutation,
+} from '@/services/work/projects/mutations';
 import { useTasksQuery } from '@/services/work/tasks/queries';
 import {
   useCreateTaskMutation,
@@ -41,6 +45,7 @@ import {
 import { useFoldersQuery } from '@/services/work/folders/queries';
 import {
   useCreateFolderMutation,
+  useUpdateFolderMutation,
   useDeleteFolderMutation,
 } from '@/services/work/folders/mutations';
 import { useTodosQuery } from '@/services/work/todos/queries';
@@ -104,6 +109,7 @@ export default function PeakBoard() {
       const todo: Todo = {
         id: t.id,
         title: t.title,
+        description: t.description,
         starred: t.starred,
         assignee: t.assignee,
         createdAt: t.createdAt,
@@ -154,10 +160,13 @@ export default function PeakBoard() {
 
   // ====== mutations ======
   const createProjectMutation = useCreateProjectMutation();
+  const updateProjectMutation = useUpdateProjectMutation();
+  const deleteProjectMutation = useDeleteProjectMutation();
   const createTaskMutation = useCreateTaskMutation(activeProjectId);
   const updateTaskMutation = useUpdateTaskMutation(activeProjectId);
   const deleteTaskMutation = useDeleteTaskMutation(activeProjectId);
   const createFolderMutation = useCreateFolderMutation(activeProjectId);
+  const updateFolderMutation = useUpdateFolderMutation(activeProjectId);
   const deleteFolderMutation = useDeleteFolderMutation(activeProjectId);
   const createTodoMutation = useCreateTodoMutation(activeProjectId);
   const updateTodoMutation = useUpdateTodoMutation(activeProjectId);
@@ -180,6 +189,8 @@ export default function PeakBoard() {
     { source: TodoSource; todoId: string } | null
   >(null);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -197,6 +208,32 @@ export default function PeakBoard() {
           alert('프로젝트 생성에 실패했어요.');
         },
       }
+    );
+  };
+
+  const handleRenameProject = (projectId: string, name: string) => {
+    updateProjectMutation.mutate(
+      { projectId, name },
+      { onError: () => alert('프로젝트 이름 변경에 실패했어요.') }
+    );
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    deleteProjectMutation.mutate(
+      { projectId },
+      {
+        onSuccess: () => {
+          if (activeProjectId === projectId) setActiveProjectId(null);
+        },
+        onError: () => alert('프로젝트 삭제에 실패했어요.'),
+      }
+    );
+  };
+
+  const handleRenameFolder = (folderId: string, name: string) => {
+    updateFolderMutation.mutate(
+      { folderId, name },
+      { onError: () => alert('폴더 이름 변경에 실패했어요.') }
     );
   };
 
@@ -274,9 +311,9 @@ export default function PeakBoard() {
     return folders.find((f) => f.id === source.id)?.name ?? '';
   };
 
-  const handleAddTodo = (source: TodoSource, title: string, assignee: string) => {
+  const handleAddTodo = (source: TodoSource, title: string, assignee: string, description?: string) => {
     createTodoMutation.mutate(
-      { parent: { kind: source.kind, id: source.id }, title, assignee },
+      { parent: { kind: source.kind, id: source.id }, title, assignee, description },
       {
         onError: (err) => {
           console.error('아이디어 생성 실패:', err);
@@ -485,32 +522,54 @@ export default function PeakBoard() {
   })();
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800">
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 overflow-hidden">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         projects={sidebarProjects}
         activeProjectId={activeProjectId}
         folders={folders}
         onAddProject={handleAddProject}
-        onSelectProject={setActiveProjectId}
-        onAddFolder={() => setAddFolderModalOpen(true)}
-        onSelectFolder={setViewingFolderId}
+        onSelectProject={(id) => { setActiveProjectId(id); setSidebarOpen(false); }}
+        onAddFolder={() => { setAddFolderModalOpen(true); setSidebarOpen(false); }}
+        onSelectFolder={(id) => { setViewingFolderId(id); setSidebarOpen(false); }}
+        onRenameProject={handleRenameProject}
+        onDeleteProject={(id) => setDeletingProjectId(id)}
+        onRenameFolder={handleRenameFolder}
+        onDeleteFolder={(id) => setDeletingFolderId(id)}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b flex items-center justify-between px-8">
-          <h1 className="text-xl font-bold text-gray-800">
-            {activeProject ? activeProject.name : '프로젝트를 선택하세요'}
-          </h1>
+        <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden text-gray-600 hover:text-gray-900"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="메뉴 열기"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-sm md:text-lg font-bold text-gray-800">
+              {activeProject ? activeProject.name : '프로젝트를 선택하세요'}
+            </h1>
+          </div>
           <button
             onClick={() => setTaskModalOpen(true)}
             disabled={!activeProject}
-            className="flex items-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            className="flex items-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-3 py-1.5 text-xs md:px-4 md:py-2 md:text-sm rounded-md  font-medium transition-colors"
           >
-            <Plus className="w-4 h-4 mr-2" />새 작업 추가
+            <Plus className="w-4 h-4 mr-2 " />새 작업 추가
           </button>
         </header>
 
-        <div className="flex-1 overflow-x-auto p-8">
+        <div className="flex-1 overflow-auto p-4 lg:p-8">
           {activeProject ? (
             <DndContext
               sensors={sensors}
@@ -520,7 +579,7 @@ export default function PeakBoard() {
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
             >
-              <div className="flex gap-6 h-full items-start">
+              <div className="flex flex-col lg:flex-row gap-6 h-full items-start">
                 {COLUMNS.map((col) => {
                   const colTasks = activeProject.tasks.filter((t) => t.status === col.status);
                   return (
@@ -587,6 +646,16 @@ export default function PeakBoard() {
         open={addFolderModalOpen}
         onClose={() => setAddFolderModalOpen(false)}
         onSubmit={handleAddFolder}
+      />
+
+      <ConfirmModal
+        open={!!deletingProjectId}
+        title="프로젝트 삭제"
+        message="프로젝트를 삭제하면 모든 작업, 폴더, 할 일이 함께 삭제됩니다."
+        onConfirm={() => {
+          if (deletingProjectId) handleDeleteProject(deletingProjectId);
+        }}
+        onClose={() => setDeletingProjectId(null)}
       />
 
       <ConfirmModal
@@ -674,8 +743,8 @@ export default function PeakBoard() {
         open={!!addTodoTarget}
         taskTitle={addTodoContextLabel}
         onClose={() => setAddTodoTarget(null)}
-        onSubmit={(title, assignee) => {
-          if (addTodoTarget) handleAddTodo(addTodoTarget, title, assignee);
+        onSubmit={(title, assignee, description) => {
+          if (addTodoTarget) handleAddTodo(addTodoTarget, title, assignee, description);
         }}
       />
 

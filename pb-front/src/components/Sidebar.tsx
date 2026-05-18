@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Plus, FolderKanban, Folder as FolderIcon } from 'lucide-react';
+import { CheckCircle2, Plus, FolderKanban, Folder as FolderIcon, X, Pencil, Trash2 } from 'lucide-react';
 import type { Folder, Project } from '@/lib/types';
 
 interface SidebarProps {
@@ -12,6 +12,12 @@ interface SidebarProps {
   onSelectProject: (id: string) => void;
   onAddFolder: () => void;
   onSelectFolder: (id: string) => void;
+  onRenameProject?: (id: string, name: string) => void;
+  onDeleteProject?: (id: string) => void;
+  onRenameFolder?: (id: string, name: string) => void;
+  onDeleteFolder?: (id: string) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export default function Sidebar({
@@ -22,31 +28,72 @@ export default function Sidebar({
   onSelectProject,
   onAddFolder,
   onSelectFolder,
+  onRenameProject,
+  onDeleteProject,
+  onRenameFolder,
+  onDeleteFolder,
+  isOpen = false,
+  onClose,
 }: SidebarProps) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [editingId, setEditingId] = useState<{ kind: 'project' | 'folder'; id: string } | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (adding) inputRef.current?.focus();
   }, [adding]);
 
+  useEffect(() => {
+    if (editingId) editInputRef.current?.focus();
+  }, [editingId]);
+
   const submit = () => {
     const trimmed = name.trim();
-    if (!trimmed) {
-      setAdding(false);
-      return;
-    }
+    if (!trimmed) { setAdding(false); return; }
     onAddProject(trimmed);
     setName('');
     setAdding(false);
   };
 
+  const submitRename = () => {
+    const trimmed = editingName.trim();
+    if (trimmed && editingId?.kind === 'project') onRenameProject?.(editingId.id, trimmed);
+    if (trimmed && editingId?.kind === 'folder') onRenameFolder?.(editingId.id, trimmed);
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const startEdit = (kind: 'project' | 'folder', id: string, currentName: string) => {
+    setEditingId({ kind, id });
+    setEditingName(currentName);
+  };
+
   return (
-    <aside className="w-64 bg-gray-900 text-gray-300 flex flex-col">
+    <aside
+      className={`w-64 bg-gray-900 text-gray-300 flex flex-col shrink-0
+        fixed inset-y-0 left-0 z-40 transition-transform duration-300
+        lg:static lg:translate-x-0
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+    >
       <div className="h-16 flex items-center px-6 border-b border-gray-800">
         <CheckCircle2 className="w-6 h-6 text-indigo-400 mr-2" />
         <span className="text-white font-bold text-lg tracking-wide">PeakBoard</span>
+        <button
+          className="ml-auto lg:hidden text-gray-400 hover:text-white"
+          onClick={onClose}
+          aria-label="사이드바 닫기"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <div className="px-4 pt-4">
@@ -59,10 +106,7 @@ export default function Sidebar({
             onBlur={submit}
             onKeyDown={(e) => {
               if (e.key === 'Enter') submit();
-              if (e.key === 'Escape') {
-                setName('');
-                setAdding(false);
-              }
+              if (e.key === 'Escape') { setName(''); setAdding(false); }
             }}
             placeholder="프로젝트 이름"
             className="w-full px-3 py-2 bg-gray-800 text-white text-sm rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-500"
@@ -79,32 +123,63 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        <p className="px-3 pt-2 pb-1 text-xs uppercase tracking-wider text-gray-500">
-          프로젝트
-        </p>
+        <p className="px-3 pt-2 pb-1 text-xs uppercase tracking-wider text-gray-500">프로젝트</p>
+
         {projects.length === 0 && !adding ? (
-          <p className="px-3 py-2 text-xs text-gray-500">
-            아직 프로젝트가 없습니다.
-          </p>
+          <p className="px-3 py-2 text-xs text-gray-500">아직 프로젝트가 없습니다.</p>
         ) : (
           projects.map((p) => {
             const active = p.id === activeProjectId;
+            const isEditing = editingId?.kind === 'project' && editingId.id === p.id;
             return (
-              <button
+              <div
                 key={p.id}
-                onClick={() => onSelectProject(p.id)}
-                className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                  active
-                    ? 'bg-gray-800 text-white'
-                    : 'hover:bg-gray-800 hover:text-white'
-                }`}
+                className={`group flex items-center px-3 py-2 rounded-lg text-sm transition-colors
+                  ${active ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
               >
-                <FolderKanban className="w-4 h-4 mr-2 shrink-0" />
-                <span className="truncate">{p.name}</span>
-                <span className="ml-auto text-xs text-gray-500">
-                  {p.tasks.length}
-                </span>
-              </button>
+                {isEditing ? (
+                  <input
+                    ref={editInputRef}
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={submitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') submitRename();
+                      if (e.key === 'Escape') cancelEdit();
+                    }}
+                    className="flex-1 px-2 py-0.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:outline-none"
+                  />
+                ) : (
+                  <>
+                    <button
+                      className="flex-1 flex items-center min-w-0 text-left"
+                      onClick={() => onSelectProject(p.id)}
+                    >
+                      <FolderKanban className="w-4 h-4 mr-2 shrink-0" />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                    <span className="ml-2 text-xs text-gray-500 group-hover:hidden shrink-0">
+                      {p.tasks.length}
+                    </span>
+                    <div className="hidden group-hover:flex items-center gap-0.5 ml-2 shrink-0">
+                      <button
+                        onClick={() => startEdit('project', p.id, p.name)}
+                        className="p-1 rounded text-gray-400 hover:text-white"
+                        aria-label="이름 수정"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteProject?.(p.id)}
+                        className="p-1 rounded text-gray-400 hover:text-red-400"
+                        aria-label="삭제"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             );
           })
         )}
@@ -112,9 +187,7 @@ export default function Sidebar({
         {activeProjectId && (
           <>
             <div className="flex items-center justify-between px-3 pt-6 pb-1">
-              <p className="text-xs uppercase tracking-wider text-gray-500">
-                폴더
-              </p>
+              <p className="text-xs uppercase tracking-wider text-gray-500">폴더</p>
               <button
                 type="button"
                 onClick={onAddFolder}
@@ -125,23 +198,60 @@ export default function Sidebar({
               </button>
             </div>
             {folders.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-gray-500">
-                폴더가 없습니다.
-              </p>
+              <p className="px-3 py-2 text-xs text-gray-500">폴더가 없습니다.</p>
             ) : (
-              folders.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => onSelectFolder(f.id)}
-                  className="w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left hover:bg-gray-800 hover:text-white"
-                >
-                  <FolderIcon className="w-4 h-4 mr-2 shrink-0" />
-                  <span className="truncate">{f.name}</span>
-                  <span className="ml-auto text-xs text-gray-500">
-                    {f.todos.length}
-                  </span>
-                </button>
-              ))
+              folders.map((f) => {
+                const isEditing = editingId?.kind === 'folder' && editingId.id === f.id;
+                return (
+                  <div
+                    key={f.id}
+                    className="group flex items-center px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-800 hover:text-white"
+                  >
+                    {isEditing ? (
+                      <input
+                        ref={editInputRef}
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={submitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') submitRename();
+                          if (e.key === 'Escape') cancelEdit();
+                        }}
+                        className="flex-1 px-2 py-0.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:outline-none"
+                      />
+                    ) : (
+                      <>
+                        <button
+                          className="flex-1 flex items-center min-w-0 text-left"
+                          onClick={() => onSelectFolder(f.id)}
+                        >
+                          <FolderIcon className="w-4 h-4 mr-2 shrink-0" />
+                          <span className="truncate">{f.name}</span>
+                        </button>
+                        <span className="ml-2 text-xs text-gray-500 group-hover:hidden shrink-0">
+                          {f.todos.length}
+                        </span>
+                        <div className="hidden group-hover:flex items-center gap-0.5 ml-2 shrink-0">
+                          <button
+                            onClick={() => startEdit('folder', f.id, f.name)}
+                            className="p-1 rounded text-gray-400 hover:text-white"
+                            aria-label="이름 수정"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteFolder?.(f.id)}
+                            className="p-1 rounded text-gray-400 hover:text-red-400"
+                            aria-label="삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
             )}
           </>
         )}

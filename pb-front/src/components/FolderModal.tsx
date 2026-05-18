@@ -49,13 +49,13 @@ export default function FolderModal({
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            아이디어 추가
+            할 일 추가
           </button>
         </div>
 
         <TodoListView
           todos={todos}
-          emptyText="아직 아이디어가 없습니다. 위의 추가 버튼으로 등록해보세요."
+          emptyText="아직 할 일이 없습니다. 위의 추가 버튼으로 등록해보세요."
           onToggleStar={onToggleStar}
           onUpdate={onUpdate}
           onDelete={onRequestDelete}

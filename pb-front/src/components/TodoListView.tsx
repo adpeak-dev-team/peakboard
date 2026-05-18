@@ -25,7 +25,7 @@ export interface TodoListViewProps {
   onToggleStar: (todoId: string) => void;
   onUpdate: (
     todoId: string,
-    patch: Partial<Pick<Todo, 'title' | 'assignee'>>
+    patch: Partial<Pick<Todo, 'title' | 'assignee' | 'description'>>
   ) => void;
   onDelete: (todoId: string) => void;
   onReorder: (orderedIds: string[]) => void;
@@ -33,21 +33,20 @@ export interface TodoListViewProps {
   moveLabel?: string;
 }
 
+type Draft = { title: string; description: string; assignee: string };
+
 function formatCreatedAt(ts: number): string {
   const d = new Date(ts);
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(d.getFullYear() % 100)}/${pad(d.getMonth() + 1)}/${pad(
-    d.getDate()
-  )} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getFullYear() % 100)}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 interface TodoRowProps {
   todo: Todo;
   isEditing: boolean;
-  draftTitle: string;
-  draftAssignee: string;
+  draft: Draft;
   moveLabel: string;
-  onChangeDraft: (patch: { title?: string; assignee?: string }) => void;
+  onChangeDraft: (patch: Partial<Draft>) => void;
   onToggleStar: () => void;
   onStartEdit: () => void;
   onSaveEdit: () => void;
@@ -59,8 +58,7 @@ interface TodoRowProps {
 function TodoRow({
   todo,
   isEditing,
-  draftTitle,
-  draftAssignee,
+  draft,
   moveLabel,
   onChangeDraft,
   onToggleStar,
@@ -70,14 +68,8 @@ function TodoRow({
   onDelete,
   onMove,
 }: TodoRowProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: todo.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: todo.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -92,6 +84,7 @@ function TodoRow({
       {...attributes}
       className="py-2 border-b border-gray-100 last:border-b-0"
     >
+      {/* 제목 행 */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -109,18 +102,14 @@ function TodoRow({
           aria-label={todo.starred ? '별 해제' : '별 표시'}
         >
           <Star
-            className={`w-5 h-5 ${
-              todo.starred
-                ? 'text-yellow-400'
-                : 'text-gray-300 hover:text-gray-400'
-            }`}
+            className={`w-5 h-5 ${todo.starred ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'}`}
             fill={todo.starred ? 'currentColor' : 'none'}
           />
         </button>
         {isEditing ? (
           <input
             type="text"
-            value={draftTitle}
+            value={draft.title}
             onChange={(e) => onChangeDraft({ title: e.target.value })}
             onPointerDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
@@ -135,11 +124,33 @@ function TodoRow({
           </span>
         )}
       </div>
+
+      {/* 설명 — 수정 모드: textarea / 뷰 모드: 텍스트 (있을 때만) */}
+      {isEditing ? (
+        <div className="pl-12 pt-1">
+          <textarea
+            value={draft.description}
+            onChange={(e) => onChangeDraft({ description: e.target.value })}
+            onPointerDown={(e) => e.stopPropagation()}
+            placeholder="설명 (선택)"
+            rows={2}
+            className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+          />
+        </div>
+      ) : (
+        todo.description && (
+          <p className="pl-12 pt-0.5 text-xs text-gray-400 wrap-break-word whitespace-pre-wrap">
+            {todo.description}
+          </p>
+        )
+      )}
+
+      {/* 담당자 / 날짜 / 버튼 행 */}
       <div className="flex items-center justify-end gap-2 pl-12 pt-1 text-xs text-gray-500">
         {isEditing ? (
           <input
             type="text"
-            value={draftAssignee}
+            value={draft.assignee}
             onChange={(e) => onChangeDraft({ assignee: e.target.value })}
             onPointerDown={(e) => e.stopPropagation()}
             placeholder="담당자"
@@ -199,7 +210,7 @@ function TodoRow({
 
 export default function TodoListView({
   todos,
-  emptyText = '아직 아이디어가 없습니다.',
+  emptyText = '아직 할 일이 없습니다.',
   onToggleStar,
   onUpdate,
   onDelete,
@@ -208,10 +219,7 @@ export default function TodoListView({
   moveLabel = '이동',
 }: TodoListViewProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ title: string; assignee: string }>({
-    title: '',
-    assignee: '',
-  });
+  const [draft, setDraft] = useState<Draft>({ title: '', description: '', assignee: '' });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -219,18 +227,19 @@ export default function TodoListView({
 
   const startEdit = (todo: Todo) => {
     setEditingId(todo.id);
-    setDraft({ title: todo.title, assignee: todo.assignee });
+    setDraft({ title: todo.title, description: todo.description, assignee: todo.assignee });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-  };
+  const cancelEdit = () => setEditingId(null);
 
   const saveEdit = (todoId: string) => {
     const title = draft.title.trim();
-    const assignee = draft.assignee.trim();
     if (!title) return;
-    onUpdate(todoId, { title, assignee });
+    onUpdate(todoId, {
+      title,
+      description: draft.description.trim(),
+      assignee: draft.assignee.trim(),
+    });
     setEditingId(null);
   };
 
@@ -240,38 +249,25 @@ export default function TodoListView({
     const oldIdx = todos.findIndex((i) => i.id === active.id);
     const newIdx = todos.findIndex((i) => i.id === over.id);
     if (oldIdx < 0 || newIdx < 0) return;
-    const reordered = arrayMove(todos, oldIdx, newIdx).map((i) => i.id);
-    onReorder(reordered);
+    onReorder(arrayMove(todos, oldIdx, newIdx).map((i) => i.id));
   };
 
   if (todos.length === 0) {
-    return (
-      <p className="text-sm text-gray-400 py-6 text-center">{emptyText}</p>
-    );
+    return <p className="text-sm text-gray-400 py-6 text-center">{emptyText}</p>;
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={todos.map((i) => i.id)}
-        strategy={verticalListSortingStrategy}
-      >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={todos.map((i) => i.id)} strategy={verticalListSortingStrategy}>
         <ul className="max-h-80 overflow-y-auto">
           {todos.map((todo) => (
             <TodoRow
               key={todo.id}
               todo={todo}
               isEditing={editingId === todo.id}
-              draftTitle={draft.title}
-              draftAssignee={draft.assignee}
+              draft={draft}
               moveLabel={moveLabel}
-              onChangeDraft={(patch) =>
-                setDraft((prev) => ({ ...prev, ...patch }))
-              }
+              onChangeDraft={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
               onToggleStar={() => onToggleStar(todo.id)}
               onStartEdit={() => startEdit(todo)}
               onSaveEdit={() => saveEdit(todo.id)}

@@ -55,15 +55,15 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
     let statusLabel: string;
     if (todoCount === 0) {
       statusIcon = <MinusCircle className="w-4 h-4 text-gray-400" />;
-      statusLabel = '아이디어 없음';
+      statusLabel = '할 일 없음';
     } else if (hasEmptyStar) {
       statusIcon = <Star className="w-4 h-4 text-gray-300" fill="none" />;
-      statusLabel = '아이디어 있음';
+      statusLabel = '할 일이 있음';
     } else {
       statusIcon = (
         <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
       );
-      statusLabel = '모든 아이디어 별 표시';
+      statusLabel = '모든 할 일 별 표시';
     }
 
     return (
@@ -72,13 +72,11 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
         style={style}
         {...(dragHandleProps?.attributes ?? {})}
         {...(dragHandleProps?.listeners ?? {})}
-        className={`group relative bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${border} ${
-          isDone ? 'opacity-70' : ''
-        } ${isDragging ? 'opacity-40' : ''} ${
-          isOverlay
+        className={`group relative bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${border} ${isDone ? 'opacity-70' : ''
+          } ${isDragging ? 'opacity-40' : ''} ${isOverlay
             ? 'cursor-grabbing shadow-lg rotate-1'
             : 'cursor-grab active:cursor-grabbing'
-        }`}
+          }`}
       >
         <div className="flex items-start gap-2">
           <span
@@ -89,9 +87,8 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
             {statusIcon}
           </span>
           <p
-            className={`text-sm flex-1 min-w-0 wrap-break-word ${
-              isDone ? 'line-through text-gray-400' : 'text-gray-700 font-medium'
-            }`}
+            className={`text-sm flex-1 min-w-0 wrap-break-word ${isDone ? 'line-through text-gray-400' : 'text-gray-700 font-medium'
+              }`}
           >
             {task.title}
           </p>
@@ -103,7 +100,7 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
               type="button"
               onClick={() => onSearch?.(task.id)}
               className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-              aria-label="아이디어 보기"
+              aria-label="할 일 보기"
             >
               <Search className="w-3.5 h-3.5" />
             </button>
@@ -113,7 +110,7 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
                   type="button"
                   onClick={() => onAddSub?.(task.id)}
                   className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                  aria-label="아이디어 추가"
+                  aria-label="할 일 추가"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>

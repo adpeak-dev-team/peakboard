@@ -18,6 +18,7 @@ export async function createTodo(input: CreateTodoInput): Promise<TodoDTO> {
       : `/folders/${input.parent.id}/todos`;
   const { data } = await apiClient.post<TodoDTO>(url, {
     title: input.title,
+    description: input.description,
     assignee: input.assignee,
   });
   return data;

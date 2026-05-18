@@ -93,6 +93,32 @@ const folderRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  fastify.patch<{ Params: { folderId: string }; Body: { name?: unknown } }>(
+    '/folders/:folderId',
+    async (request, reply) => {
+      const folderId = Number(request.params.folderId);
+      if (!Number.isInteger(folderId) || folderId <= 0) {
+        return reply.status(400).send({ resultMessage: '잘못된 folderId 입니다.' });
+      }
+      const rawName = request.body?.name;
+      const name = typeof rawName === 'string' ? rawName.trim() : '';
+      if (!name) return reply.status(400).send({ resultMessage: '폴더 이름이 필요합니다.' });
+      if (name.length > 100) return reply.status(400).send({ resultMessage: '폴더 이름은 100자 이하여야 합니다.' });
+      try {
+        const [result] = await sql_con
+          .promise()
+          .query<ResultSetHeader>('UPDATE folders SET name = ? WHERE id = ?', [name, folderId]);
+        if (result.affectedRows === 0) {
+          return reply.status(404).send({ resultMessage: '해당 폴더를 찾을 수 없습니다.' });
+        }
+        return { id: String(folderId), name, todos: [] };
+      } catch (err) {
+        request.log.error(err);
+        return reply.status(500).send({ resultMessage: '폴더 수정 실패' });
+      }
+    }
+  );
+
   fastify.delete<{ Params: { folderId: string } }>('/folders/:folderId', async (request, reply) => {
     const folderId = Number(request.params.folderId);
     if (!Number.isInteger(folderId) || folderId <= 0) {
