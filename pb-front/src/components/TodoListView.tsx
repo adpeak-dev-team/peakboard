@@ -151,28 +151,24 @@ function TodoRow({
         )
       )}
 
-      {/* 담당자 / 날짜 / 버튼 행 */}
-      <div className="flex items-center justify-end gap-2 pl-12 pt-1 text-xs text-gray-500">
+      {/* 담당자 / 날짜 / 버튼 */}
+      <div className="pl-12 pt-1 text-xs text-gray-500">
         {isEditing ? (
-          <input
-            type="text"
-            value={draft.assignee}
-            onChange={(e) => onChangeDraft({ assignee: e.target.value })}
-            onPointerDown={(e) => e.stopPropagation()}
-            placeholder="담당자"
-            className="px-2 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-32"
-          />
-        ) : (
-          <span>담당자: {todo.assignee || '-'}</span>
-        )}
-        <span className="text-gray-300">|</span>
-        <span>등록일: {formatCreatedAt(todo.createdAt)}</span>
-        {isEditing ? (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={draft.assignee}
+              onChange={(e) => onChangeDraft({ assignee: e.target.value })}
+              onPointerDown={(e) => e.stopPropagation()}
+              placeholder="담당자"
+              className="px-2 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-32"
+            />
+            <span className="text-gray-300">|</span>
+            <span>등록일: {formatCreatedAt(todo.createdAt)}</span>
             <button
               type="button"
               onClick={onSaveEdit}
-              className="ml-1 px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded"
+              className="ml-auto px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded"
             >
               저장
             </button>
@@ -183,37 +179,44 @@ function TodoRow({
             >
               취소
             </button>
-          </>
+          </div>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={onStartEdit}
-              className="ml-1 px-2 py-1 text-xs text-blue-500 hover:bg-blue-50 rounded"
-            >
-              수정
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
-            >
-              삭제
-            </button>
-            <button
-              type="button"
-              onClick={onMove}
-              className="px-2 py-1 text-xs text-green-500 hover:bg-green-50 rounded"
-            >
-              {moveLabel}
-            </button>
-            <button
-              type="button"
-              onClick={onCopy}
-              className="px-2 py-1 text-xs text-purple-500 hover:bg-purple-50 rounded"
-            >
-              {copyLabel}
-            </button>
+            <div className="flex items-center gap-2">
+              <span>담당자: {todo.assignee || '-'}</span>
+              <span className="text-gray-300">|</span>
+              <span>등록일: {formatCreatedAt(todo.createdAt)}</span>
+            </div>
+            <div className="flex items-center justify-end gap-1 pt-0.5">
+              <button
+                type="button"
+                onClick={onStartEdit}
+                className="px-2 py-1 text-xs text-blue-500 hover:bg-blue-50 rounded"
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
+              >
+                삭제
+              </button>
+              <button
+                type="button"
+                onClick={onMove}
+                className="px-2 py-1 text-xs text-green-500 hover:bg-green-50 rounded"
+              >
+                {moveLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onCopy}
+                className="px-2 py-1 text-xs text-purple-500 hover:bg-purple-50 rounded"
+              >
+                {copyLabel}
+              </button>
+            </div>
           </>
         )}
       </div>
