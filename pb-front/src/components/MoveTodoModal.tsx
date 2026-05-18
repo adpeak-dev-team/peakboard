@@ -12,6 +12,7 @@ interface MoveTodoModalProps {
   todoTitle: string;
   targets: MoveTarget[];
   targetKind: 'folder' | 'task';
+  mode?: 'move' | 'copy';
   onClose: () => void;
   onPick: (target: MoveTarget) => void;
 }
@@ -21,21 +22,24 @@ export default function MoveTodoModal({
   todoTitle,
   targets,
   targetKind,
+  mode = 'move',
   onClose,
   onPick,
 }: MoveTodoModalProps) {
-  const title =
-    targetKind === 'folder' ? '폴더로 이동' : '작업으로 이동';
+  const isCopy = mode === 'copy';
+  const title = isCopy
+    ? targetKind === 'folder' ? '폴더로 복사' : '작업으로 복사'
+    : targetKind === 'folder' ? '폴더로 이동' : '작업으로 이동';
   const empty =
     targetKind === 'folder'
-      ? '이동할 폴더가 없습니다. 사이드바에서 먼저 폴더를 만들어주세요.'
-      : '이동할 작업이 없습니다. 먼저 작업을 추가해주세요.';
+      ? `${isCopy ? '복사' : '이동'}할 폴더가 없습니다. 사이드바에서 먼저 폴더를 만들어주세요.`
+      : `${isCopy ? '복사' : '이동'}할 작업이 없습니다. 먼저 작업을 추가해주세요.`;
 
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <div className="space-y-3">
         <div className="text-xs text-gray-500">
-          이동할 할 일:{' '}
+          {isCopy ? '복사' : '이동'}할 할 일:{' '}
           <span className="text-gray-700 font-medium">{todoTitle}</span>
         </div>
 

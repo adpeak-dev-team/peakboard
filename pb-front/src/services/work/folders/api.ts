@@ -6,16 +6,13 @@ import type {
   FolderDTO,
 } from '../type';
 
-export async function fetchFolders(projectId: string): Promise<FolderDTO[]> {
-  const { data } = await apiClient.get<FolderDTO[]>(`/projects/${projectId}/folders`);
+export async function fetchFolders(): Promise<FolderDTO[]> {
+  const { data } = await apiClient.get<FolderDTO[]>('/folders');
   return data;
 }
 
 export async function createFolder(input: CreateFolderInput): Promise<FolderDTO> {
-  const { data } = await apiClient.post<FolderDTO>(
-    `/projects/${input.projectId}/folders`,
-    { name: input.name }
-  );
+  const { data } = await apiClient.post<FolderDTO>('/folders', { name: input.name });
   return data;
 }
 

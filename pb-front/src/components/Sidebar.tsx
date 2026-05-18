@@ -184,76 +184,72 @@ export default function Sidebar({
           })
         )}
 
-        {activeProjectId && (
-          <>
-            <div className="flex items-center justify-between px-3 pt-6 pb-1">
-              <p className="text-xs uppercase tracking-wider text-gray-500">폴더</p>
-              <button
-                type="button"
-                onClick={onAddFolder}
-                className="p-1 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
-                aria-label="폴더 추가"
+        <div className="flex items-center justify-between px-3 pt-6 pb-1">
+          <p className="text-xs uppercase tracking-wider text-gray-500">폴더</p>
+          <button
+            type="button"
+            onClick={onAddFolder}
+            className="p-1 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+            aria-label="폴더 추가"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {folders.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-gray-500">폴더가 없습니다.</p>
+        ) : (
+          folders.map((f) => {
+            const isEditing = editingId?.kind === 'folder' && editingId.id === f.id;
+            return (
+              <div
+                key={f.id}
+                className="group flex items-center px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-800 hover:text-white"
               >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {folders.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-gray-500">폴더가 없습니다.</p>
-            ) : (
-              folders.map((f) => {
-                const isEditing = editingId?.kind === 'folder' && editingId.id === f.id;
-                return (
-                  <div
-                    key={f.id}
-                    className="group flex items-center px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-800 hover:text-white"
-                  >
-                    {isEditing ? (
-                      <input
-                        ref={editInputRef}
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={submitRename}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') submitRename();
-                          if (e.key === 'Escape') cancelEdit();
-                        }}
-                        className="flex-1 px-2 py-0.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:outline-none"
-                      />
-                    ) : (
-                      <>
-                        <button
-                          className="flex-1 flex items-center min-w-0 text-left"
-                          onClick={() => onSelectFolder(f.id)}
-                        >
-                          <FolderIcon className="w-4 h-4 mr-2 shrink-0" />
-                          <span className="truncate">{f.name}</span>
-                        </button>
-                        <span className="ml-2 text-xs text-gray-500 group-hover:hidden shrink-0">
-                          {f.todos.length}
-                        </span>
-                        <div className="hidden group-hover:flex items-center gap-0.5 ml-2 shrink-0">
-                          <button
-                            onClick={() => startEdit('folder', f.id, f.name)}
-                            className="p-1 rounded text-gray-400 hover:text-white"
-                            aria-label="이름 수정"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteFolder?.(f.id)}
-                            className="p-1 rounded text-gray-400 hover:text-red-400"
-                            aria-label="삭제"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </>
+                {isEditing ? (
+                  <input
+                    ref={editInputRef}
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={submitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') submitRename();
+                      if (e.key === 'Escape') cancelEdit();
+                    }}
+                    className="flex-1 px-2 py-0.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:outline-none"
+                  />
+                ) : (
+                  <>
+                    <button
+                      className="flex-1 flex items-center min-w-0 text-left"
+                      onClick={() => onSelectFolder(f.id)}
+                    >
+                      <FolderIcon className="w-4 h-4 mr-2 shrink-0" />
+                      <span className="truncate">{f.name}</span>
+                    </button>
+                    <span className="ml-2 text-xs text-gray-500 group-hover:hidden shrink-0">
+                      {f.todos.length}
+                    </span>
+                    <div className="hidden group-hover:flex items-center gap-0.5 ml-2 shrink-0">
+                      <button
+                        onClick={() => startEdit('folder', f.id, f.name)}
+                        className="p-1 rounded text-gray-400 hover:text-white"
+                        aria-label="이름 수정"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteFolder?.(f.id)}
+                        className="p-1 rounded text-gray-400 hover:text-red-400"
+                        aria-label="삭제"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })
         )}
       </nav>
 
