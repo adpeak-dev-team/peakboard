@@ -6,7 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -210,7 +211,8 @@ export default function PeakBoard() {
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   );
 
   // ====== project handlers ======
@@ -254,6 +256,13 @@ export default function PeakBoard() {
   };
 
   // ====== task handlers (DB) ======
+  const handleRenameTask = (taskId: string, title: string) => {
+    updateTaskMutation.mutate(
+      { taskId, patch: { title } },
+      { onError: () => alert('작업 이름 변경에 실패했어요.') }
+    );
+  };
+
   const handleAddTask = (title: string) => {
     if (!activeProjectId) return;
     createTaskMutation.mutate(
@@ -670,6 +679,7 @@ export default function PeakBoard() {
                             onAddSub={(taskId) =>
                               setAddTodoTarget({ kind: 'task', id: taskId })
                             }
+                            onRename={handleRenameTask}
                           />
                         ))}
                       </SortableContext>
