@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GripVertical, Star } from 'lucide-react';
+import { GripVertical, Star, FileText } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -31,6 +31,8 @@ export interface TodoListViewProps {
   onReorder: (orderedIds: string[]) => void;
   onMove: (todoId: string) => void;
   onCopy: (todoId: string) => void;
+  // 문서 첨부가 가능한 컨텍스트(task todo)에서만 전달. 폴더 todo 는 생략 → 버튼 숨김.
+  onOpenDocument?: (todoId: string) => void;
   moveLabel?: string;
   copyLabel?: string;
 }
@@ -57,6 +59,7 @@ interface TodoRowProps {
   onDelete: () => void;
   onMove: () => void;
   onCopy: () => void;
+  onOpenDocument?: () => void;
 }
 
 function TodoRow({
@@ -73,6 +76,7 @@ function TodoRow({
   onDelete,
   onMove,
   onCopy,
+  onOpenDocument,
 }: TodoRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: todo.id });
@@ -188,6 +192,16 @@ function TodoRow({
               <span>등록일: {formatCreatedAt(todo.createdAt)}</span>
             </div>
             <div className="flex items-center justify-end gap-1 pt-0.5">
+              {onOpenDocument && (
+                <button
+                  type="button"
+                  onClick={onOpenDocument}
+                  className="px-2 py-1 text-xs text-indigo-500 hover:bg-indigo-50 rounded flex items-center gap-0.5"
+                >
+                  <FileText className="w-3 h-3" />
+                  문서
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onStartEdit}
@@ -233,6 +247,7 @@ export default function TodoListView({
   onReorder,
   onMove,
   onCopy,
+  onOpenDocument,
   moveLabel = '이동',
   copyLabel = '복사',
 }: TodoListViewProps) {
@@ -294,6 +309,9 @@ export default function TodoListView({
               onDelete={() => onDelete(todo.id)}
               onMove={() => onMove(todo.id)}
               onCopy={() => onCopy(todo.id)}
+              onOpenDocument={
+                onOpenDocument ? () => onOpenDocument(todo.id) : undefined
+              }
             />
           ))}
         </ul>

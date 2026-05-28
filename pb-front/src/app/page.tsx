@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Menu } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,6 +29,7 @@ import FolderModal from '@/components/FolderModal';
 import AddFolderModal from '@/components/AddFolderModal';
 import MoveTodoModal, { type MoveTarget } from '@/components/MoveTodoModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import DocumentView from '@/components/DocumentView';
 import type { Folder, Todo, Project, Task, TaskStatus } from '@/lib/types';
 import { useProjectsQuery } from '@/services/work/projects/queries';
 import {
@@ -54,6 +55,14 @@ import {
   useDeleteTodoMutation,
   useUpdateTodoMutation,
 } from '@/services/work/todos/mutations';
+import { useDocumentsQuery } from '@/services/work/documents/queries';
+import {
+  useCreateDocumentMutation,
+  useUpdateDocumentMutation,
+  useDeleteDocumentMutation,
+  useAttachDocumentMutation,
+} from '@/services/work/documents/mutations';
+import { getGuestName } from '@/lib/guest';
 import { workQueryKeys, type TaskDTO, type TodoDTO } from '@/services/work/type';
 
 const SESSION_KEY = 'peakboard:activeProjectId';
@@ -101,6 +110,7 @@ export default function PeakBoard() {
   const foldersQuery = useFoldersQuery();
   const todosQuery = useTodosQuery(activeProjectId);
   const folderTodosQuery = useFolderTodosQuery();
+  const documentsQuery = useDocumentsQuery(activeProjectId);
 
   const todosByTaskId = useMemo(() => {
     const byTask = new Map<string, Todo[]>();
@@ -184,6 +194,10 @@ export default function PeakBoard() {
   const createTodoMutation = useCreateTodoMutation(activeProjectId);
   const updateTodoMutation = useUpdateTodoMutation(activeProjectId);
   const deleteTodoMutation = useDeleteTodoMutation(activeProjectId);
+  const createDocumentMutation = useCreateDocumentMutation(activeProjectId);
+  const updateDocumentMutation = useUpdateDocumentMutation(activeProjectId);
+  const deleteDocumentMutation = useDeleteDocumentMutation(activeProjectId);
+  const attachDocumentMutation = useAttachDocumentMutation();
 
   // ====== modal/state ======
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -208,6 +222,29 @@ export default function PeakBoard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
+
+  const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+
+  // 공유 링크(?doc=<id>)로 진입 시 해당 문서를 자동으로 연다.
+  useEffect(() => {
+    const doc = new URLSearchParams(window.location.search).get('doc');
+    if (doc) setViewingDocumentId(doc);
+  }, []);
+
+  // 문서 열기/닫기에 맞춰 URL 동기화 (마운트 첫 실행은 건너뜀 — 위 진입 처리와 충돌 방지)
+  const docUrlSyncRef = useRef(false);
+  useEffect(() => {
+    if (!docUrlSyncRef.current) {
+      docUrlSyncRef.current = true;
+      return;
+    }
+    if (viewingDocumentId) {
+      window.history.replaceState(null, '', `?doc=${viewingDocumentId}`);
+    } else {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [viewingDocumentId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -312,6 +349,57 @@ export default function PeakBoard() {
         onError: (err) => {
           console.error('폴더 삭제 실패:', err);
           alert('폴더 삭제에 실패했어요.');
+        },
+      }
+    );
+  };
+
+  // ====== document handlers (DB) ======
+  const handleAddDocument = (parentId?: string) => {
+    if (!activeProjectId) return;
+    createDocumentMutation.mutate(
+      { projectId: activeProjectId, parentId: parentId ?? null, createdByName: getGuestName() },
+      {
+        onSuccess: (created) => setViewingDocumentId(created.id),
+        onError: (err) => {
+          console.error('문서 생성 실패:', err);
+          alert('문서 생성에 실패했어요.');
+        },
+      }
+    );
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    deleteDocumentMutation.mutate(
+      { documentId },
+      {
+        onSuccess: () => {
+          if (viewingDocumentId === documentId) setViewingDocumentId(null);
+        },
+        onError: (err) => {
+          console.error('문서 삭제 실패:', err);
+          alert('문서 삭제에 실패했어요.');
+        },
+      }
+    );
+  };
+
+  const handleRenameDocument = (documentId: string, title: string) => {
+    updateDocumentMutation.mutate(
+      { documentId, patch: { title, updatedByName: getGuestName() } },
+      { onError: () => alert('문서 제목 변경에 실패했어요.') }
+    );
+  };
+
+  // task/todo 카드의 첨부 문서 열기 (없으면 생성)
+  const handleOpenAttachedDocument = (kind: 'task' | 'todo', id: string) => {
+    attachDocumentMutation.mutate(
+      { kind, id, createdByName: getGuestName() },
+      {
+        onSuccess: (doc) => setViewingDocumentId(doc.id),
+        onError: (err) => {
+          console.error('첨부 문서 열기 실패:', err);
+          alert('문서를 여는 데 실패했어요.');
         },
       }
     );
@@ -597,10 +685,15 @@ export default function PeakBoard() {
         projects={sidebarProjects}
         activeProjectId={activeProjectId}
         folders={folders}
+        documents={documentsQuery.data ?? []}
         onAddProject={handleAddProject}
         onSelectProject={(id) => { setActiveProjectId(id); setSidebarOpen(false); }}
         onAddFolder={() => { setAddFolderModalOpen(true); setSidebarOpen(false); }}
         onSelectFolder={(id) => { setViewingFolderId(id); setSidebarOpen(false); }}
+        onAddDocument={(parentId) => { handleAddDocument(parentId); setSidebarOpen(false); }}
+        onSelectDocument={(id) => { setViewingDocumentId(id); setSidebarOpen(false); }}
+        onRenameDocument={handleRenameDocument}
+        onDeleteDocument={(id) => setDeletingDocumentId(id)}
         onRenameProject={handleRenameProject}
         onDeleteProject={(id) => setDeletingProjectId(id)}
         onRenameFolder={handleRenameFolder}
@@ -669,6 +762,9 @@ export default function PeakBoard() {
                             onSearch={(taskId) => setViewingTaskId(taskId)}
                             onAddSub={(taskId) =>
                               setAddTodoTarget({ kind: 'task', id: taskId })
+                            }
+                            onOpenDocument={(taskId) =>
+                              handleOpenAttachedDocument('task', taskId)
                             }
                           />
                         ))}
@@ -769,6 +865,7 @@ export default function PeakBoard() {
           viewingTaskId &&
           setCopyingTodo({ source: { kind: 'task', id: viewingTaskId }, todoId })
         }
+        onOpenDocument={(todoId) => handleOpenAttachedDocument('todo', todoId)}
       />
 
       <FolderModal
@@ -878,6 +975,25 @@ export default function PeakBoard() {
             handleDeleteTodo(deletingTodo.source, deletingTodo.todoId);
         }}
         onClose={() => setDeletingTodo(null)}
+      />
+
+      {viewingDocumentId && (
+        <DocumentView
+          documentId={viewingDocumentId}
+          projectId={activeProjectId}
+          onClose={() => setViewingDocumentId(null)}
+          onRequestDelete={(id) => setDeletingDocumentId(id)}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!deletingDocumentId}
+        title="문서 삭제"
+        message="문서와 하위 문서가 모두 삭제됩니다. 삭제된 데이터는 복구 불가 합니다."
+        onConfirm={() => {
+          if (deletingDocumentId) handleDeleteDocument(deletingDocumentId);
+        }}
+        onClose={() => setDeletingDocumentId(null)}
       />
     </div>
   );

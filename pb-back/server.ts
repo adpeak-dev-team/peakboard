@@ -5,10 +5,12 @@ import cors from '@fastify/cors';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import apiRoutes from './routes/api.js';
+import { startCollabServer } from './lib/collab.js';
 
 const app = fastify({ logger: true });
 
 const port = Number(process.env.PORT || 3050);
+const collabPort = Number(process.env.HOCUSPOCUS_PORT || 1234);
 
 app.register(cors, {
   origin: [
@@ -37,6 +39,8 @@ const start = async () => {
   try {
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`server running in port ${port}`);
+    await startCollabServer(collabPort);
+    console.log(`collab (hocuspocus) running in port ${collabPort}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
