@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef } from 'react';
+import { forwardRef, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
@@ -31,6 +31,12 @@ interface TaskCardViewProps extends TaskCardCallbacks {
     listeners?: DraggableSyntheticListeners;
   };
   style?: React.CSSProperties;
+  isEditing?: boolean;
+  editValue?: string;
+  onEditChange?: (val: string) => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
+  onStartEdit?: () => void;
 }
 
 export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
@@ -52,6 +58,13 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
   ) {
     const todoCount = task.todos.length;
     const hasEmptyStar = todoCount > 0 && task.todos.some((i) => !i.starred);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (isEditing) {
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    }, [isEditing]);
 
     let statusIcon: React.ReactNode;
     let statusLabel: string;
@@ -73,11 +86,11 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
         ref={ref}
         style={style}
         {...(dragHandleProps?.attributes ?? {})}
-        {...(dragHandleProps?.listeners ?? {})}
+        {...(!isEditing ? (dragHandleProps?.listeners ?? {}) : {})}
         className={`group relative bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${border} ${isDone ? 'opacity-70' : ''
           } ${isDragging ? 'opacity-40' : ''} ${isOverlay
             ? 'cursor-grabbing shadow-lg rotate-1'
-            : 'cursor-grab active:cursor-grabbing'
+            : isEditing ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
           }`}
       >
         <div className="flex items-start gap-2">
@@ -88,12 +101,27 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
           >
             {statusIcon}
           </span>
-          <p
-            className={`text-sm flex-1 min-w-0 wrap-break-word ${isDone ? 'line-through text-gray-400' : 'text-gray-700 font-medium'
-              }`}
-          >
-            {task.title}
-          </p>
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => onEditChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onEditSave?.();
+                if (e.key === 'Escape') onEditCancel?.();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-sm flex-1 min-w-0 border border-indigo-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-700 font-medium"
+            />
+          ) : (
+            <p
+              className={`text-sm flex-1 min-w-0 wrap-break-word ${isDone ? 'line-through text-gray-400' : 'text-gray-700 font-medium'
+                }`}
+            >
+              {task.title}
+            </p>
+          )}
           <div
             className="flex items-center gap-1 shrink-0"
             onPointerDown={(e) => e.stopPropagation()}
@@ -118,20 +146,59 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
               <>
                 <button
                   type="button"
-                  onClick={() => onAddSub?.(task.id)}
-                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                  aria-label="할 일 추가"
+                  onClick={onEditSave}
+                  className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
+                  aria-label="저장"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Check className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDelete(task.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                  aria-label="삭제"
+                  onClick={onEditCancel}
+                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  aria-label="취소"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onSearch?.(task.id)}
+                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  aria-label="할 일 보기"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+                {!isDone && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onStartEdit}
+                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                      aria-label="이름 수정"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAddSub?.(task.id)}
+                      className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                      aria-label="할 일 추가"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(task.id)}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      aria-label="삭제"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -150,6 +217,9 @@ export default function TaskCard({
   onAddSub,
   onOpenDocument,
 }: TaskCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
   const {
     attributes,
     listeners,
@@ -162,6 +232,23 @@ export default function TaskCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const handleStartEdit = () => {
+    setEditValue(task.title);
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== task.title) {
+      onRename?.(task.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
   };
 
   return (
