@@ -142,7 +142,7 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
             >
               <FileText className="w-3.5 h-3.5" />
             </button>
-            {!isDone && (
+            {!isDone ? (
               <>
                 <button
                   type="button"
