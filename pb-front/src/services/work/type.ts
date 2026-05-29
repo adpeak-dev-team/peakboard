@@ -91,6 +91,56 @@ export interface DeleteTodoInput {
   kind: 'task' | 'folder';
 }
 
+// 문서(documents). content 는 TipTap JSON (Phase 2). 트리 목록은 메타만.
+export interface DocumentSummaryDTO {
+  id: string;
+  projectId: string;
+  parentId: string | null;
+  attachedTaskId: string | null;
+  attachedTodoId: string | null;
+  title: string;
+  icon: string;
+  position: number;
+  updatedAt: string;
+}
+
+export interface DocumentDTO extends DocumentSummaryDTO {
+  content: unknown | null;
+  createdByName: string;
+  updatedByName: string;
+  createdAt: string;
+}
+
+export interface CreateDocumentInput {
+  projectId: string;
+  title?: string;
+  icon?: string;
+  parentId?: string | null;
+  createdByName?: string;
+}
+
+export interface UpdateDocumentInput {
+  documentId: string;
+  patch: {
+    title?: string;
+    icon?: string;
+    content?: unknown;
+    parentId?: string | null;
+    position?: number;
+    updatedByName?: string;
+  };
+}
+
+export interface DeleteDocumentInput {
+  documentId: string;
+}
+
+export interface AttachDocumentInput {
+  kind: 'task' | 'todo';
+  id: string;
+  createdByName: string;
+}
+
 export const workQueryKeys = {
   all: ['work'] as const,
   projects: () => [...workQueryKeys.all, 'projects'] as const,
@@ -100,6 +150,10 @@ export const workQueryKeys = {
   todosAll: () => [...workQueryKeys.all, 'todos'] as const,
   todos: (projectId: string) => [...workQueryKeys.todosAll(), projectId] as const,
   folderTodosAll: () => [...workQueryKeys.all, 'folderTodos'] as const,
+  documentsAll: () => [...workQueryKeys.all, 'documents'] as const,
+  documents: (projectId: string) => [...workQueryKeys.documentsAll(), projectId] as const,
+  document: (documentId: string) =>
+    [...workQueryKeys.all, 'document', documentId] as const,
 };
 
 export type { Folder, Project, Task, TaskStatus };

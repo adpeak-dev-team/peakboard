@@ -19,6 +19,7 @@ USE peakboard;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS documents;
 DROP TABLE IF EXISTS todos;
 DROP TABLE IF EXISTS folders;
 DROP TABLE IF EXISTS tasks;
@@ -168,6 +169,57 @@ CREATE TABLE todos (
   CONSTRAINT chk_todos_exactly_one_parent CHECK (
     (task_id IS NOT NULL AND folder_id IS NULL)
     OR (task_id IS NULL AND folder_id IS NOT NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =============================================================================
+-- documents
+--   Notion 스타일 문서. 한 테이블로 두 가지 사용 모드를 모두 처리한다.
+--   1) "독립 문서 트리" — attached_task_id / attached_todo_id 가 모두 NULL.
+--      parent_id 셀프참조로 폴더형 계층 구성. position 으로 형제 정렬.
+--   2) "task/todo 첨부 문서" — attached_task_id 또는 attached_todo_id 가 채워짐.
+--      이때 parent_id 는 NULL. 카드별로 1개 첨부 (tasks/todos 쪽에서 UNIQUE 강제).
+--
+--   content_json: Phase 1~2 동안 TipTap JSON 직접 저장 (LONGTEXT).
+--   yjs_state:    Phase 3 부터 Yjs binary CRDT state 저장 (LONGBLOB).
+--                 둘 다 NULL 가능 — 빈 문서 신규 생성 시.
+--   created_by_name / updated_by_name: 게스트 이름 (sessionStorage 기반).
+--                 추후 users 활성화 시 *_user_id 컬럼 추가하고 백필.
+-- =============================================================================
+CREATE TABLE documents (
+  id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id          BIGINT UNSIGNED NOT NULL,
+  parent_id           BIGINT UNSIGNED     NULL,
+  attached_task_id    BIGINT UNSIGNED     NULL,
+  attached_todo_id    BIGINT UNSIGNED     NULL,
+  title               VARCHAR(255)    NOT NULL DEFAULT '',
+  icon                VARCHAR(16)     NOT NULL DEFAULT '',
+  position            INT             NOT NULL DEFAULT 0,
+  content_json        LONGTEXT            NULL,
+  yjs_state           LONGBLOB            NULL,
+  created_by_name     VARCHAR(100)    NOT NULL DEFAULT '',
+  updated_by_name     VARCHAR(100)    NOT NULL DEFAULT '',
+  created_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                      ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_documents_project_parent_pos (project_id, parent_id, position),
+  UNIQUE KEY uk_documents_task (attached_task_id),
+  UNIQUE KEY uk_documents_todo (attached_todo_id),
+  CONSTRAINT fk_documents_project
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_documents_parent
+    FOREIGN KEY (parent_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT fk_documents_task
+    FOREIGN KEY (attached_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_documents_todo
+    FOREIGN KEY (attached_todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+  -- 첨부 문서면 parent_id 가 비어야 하고, 두 attached_* 컬럼은 동시에 채워질 수 없음
+  CONSTRAINT chk_documents_attach_shape CHECK (
+       (attached_task_id IS NULL AND attached_todo_id IS NULL)
+    OR (attached_task_id IS NOT NULL AND attached_todo_id IS NULL AND parent_id IS NULL)
+    OR (attached_task_id IS NULL AND attached_todo_id IS NOT NULL AND parent_id IS NULL)
   )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

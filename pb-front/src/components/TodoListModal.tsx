@@ -20,6 +20,7 @@ interface TodoListModalProps {
   onReorder: (orderedIds: string[]) => void;
   onRequestMove: (todoId: string) => void;
   onRequestCopy: (todoId: string) => void;
+  onOpenDocument: (todoId: string) => void;
 }
 
 export default function TodoListModal({
@@ -34,6 +35,7 @@ export default function TodoListModal({
   onReorder,
   onRequestMove,
   onRequestCopy,
+  onOpenDocument,
 }: TodoListModalProps) {
   return (
     <Modal open={open} title={taskTitle} onClose={onClose}>
@@ -58,6 +60,7 @@ export default function TodoListModal({
           onReorder={onReorder}
           onMove={onRequestMove}
           onCopy={onRequestCopy}
+          onOpenDocument={onOpenDocument}
           moveLabel="폴더로 이동"
           copyLabel="폴더로 복사"
         />

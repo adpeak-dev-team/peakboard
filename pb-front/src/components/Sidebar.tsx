@@ -1,17 +1,23 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Plus, FolderKanban, Folder as FolderIcon, X, Pencil, Trash2 } from 'lucide-react';
+import { CheckCircle2, Plus, FolderKanban, Folder as FolderIcon, FileText, ChevronRight, ChevronDown, X, Pencil, Trash2 } from 'lucide-react';
 import type { Folder, Project } from '@/lib/types';
+import type { DocumentSummaryDTO } from '@/services/work/type';
 
 interface SidebarProps {
   projects: Project[];
   activeProjectId: string | null;
   folders: Folder[];
+  documents: DocumentSummaryDTO[];
   onAddProject: (name: string) => void;
   onSelectProject: (id: string) => void;
   onAddFolder: () => void;
   onSelectFolder: (id: string) => void;
+  onAddDocument: (parentId?: string) => void;
+  onSelectDocument: (id: string) => void;
+  onRenameDocument?: (id: string, title: string) => void;
+  onDeleteDocument?: (id: string) => void;
   onRenameProject?: (id: string, name: string) => void;
   onDeleteProject?: (id: string) => void;
   onRenameFolder?: (id: string, name: string) => void;
@@ -24,10 +30,15 @@ export default function Sidebar({
   projects,
   activeProjectId,
   folders,
+  documents,
   onAddProject,
   onSelectProject,
   onAddFolder,
   onSelectFolder,
+  onAddDocument,
+  onSelectDocument,
+  onRenameDocument,
+  onDeleteDocument,
   onRenameProject,
   onDeleteProject,
   onRenameFolder,
@@ -39,9 +50,19 @@ export default function Sidebar({
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [editingId, setEditingId] = useState<{ kind: 'project' | 'folder'; id: string } | null>(null);
+  const [editingId, setEditingId] = useState<{ kind: 'project' | 'folder' | 'document'; id: string } | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // 펼쳐진 문서(트리) 노드 집합
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpandedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     if (adding) inputRef.current?.focus();
@@ -63,6 +84,7 @@ export default function Sidebar({
     const trimmed = editingName.trim();
     if (trimmed && editingId?.kind === 'project') onRenameProject?.(editingId.id, trimmed);
     if (trimmed && editingId?.kind === 'folder') onRenameFolder?.(editingId.id, trimmed);
+    if (trimmed && editingId?.kind === 'document') onRenameDocument?.(editingId.id, trimmed);
     setEditingId(null);
     setEditingName('');
   };
@@ -72,9 +94,97 @@ export default function Sidebar({
     setEditingName('');
   };
 
-  const startEdit = (kind: 'project' | 'folder', id: string, currentName: string) => {
+  const startEdit = (kind: 'project' | 'folder' | 'document', id: string, currentName: string) => {
     setEditingId({ kind, id });
     setEditingName(currentName);
+  };
+
+  // 문서를 parentId 기준으로 트리화 (flat 목록은 이미 position, id 순으로 정렬돼 옴)
+  const docChildren = new Map<string | null, DocumentSummaryDTO[]>();
+  for (const d of documents) {
+    const key = d.parentId;
+    const list = docChildren.get(key) ?? [];
+    list.push(d);
+    docChildren.set(key, list);
+  }
+
+  const renderDocNode = (doc: DocumentSummaryDTO, depth: number): React.ReactNode => {
+    const children = docChildren.get(doc.id) ?? [];
+    const hasChildren = children.length > 0;
+    const expanded = expandedDocs.has(doc.id);
+    const isEditing = editingId?.kind === 'document' && editingId.id === doc.id;
+
+    return (
+      <div key={doc.id}>
+        <div
+          className="group flex items-center pr-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-800 hover:text-white"
+          style={{ paddingLeft: `${12 + depth * 14}px` }}
+        >
+          {isEditing ? (
+            <input
+              ref={editInputRef}
+              value={editingName}
+              onChange={(e) => setEditingName(e.target.value)}
+              onBlur={submitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitRename();
+                if (e.key === 'Escape') cancelEdit();
+              }}
+              className="flex-1 px-2 py-0.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:outline-none"
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => hasChildren && toggleExpand(doc.id)}
+                className={`shrink-0 w-4 h-4 mr-0.5 flex items-center justify-center ${hasChildren ? 'text-gray-400 hover:text-white' : 'invisible'}`}
+                aria-label={expanded ? '접기' : '펼치기'}
+              >
+                {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                className="flex-1 flex items-center min-w-0 text-left"
+                onClick={() => onSelectDocument(doc.id)}
+              >
+                {doc.icon ? (
+                  <span className="w-4 h-4 mr-2 shrink-0 text-center leading-4">{doc.icon}</span>
+                ) : (
+                  <FileText className="w-4 h-4 mr-2 shrink-0" />
+                )}
+                <span className="truncate">{doc.title || '제목 없음'}</span>
+              </button>
+              <div className="hidden group-hover:flex items-center gap-0.5 ml-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setExpandedDocs((prev) => new Set(prev).add(doc.id));
+                    onAddDocument(doc.id);
+                  }}
+                  className="p-1 rounded text-gray-400 hover:text-white"
+                  aria-label="하위 문서 추가"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => startEdit('document', doc.id, doc.title)}
+                  className="p-1 rounded text-gray-400 hover:text-white"
+                  aria-label="제목 수정"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => onDeleteDocument?.(doc.id)}
+                  className="p-1 rounded text-gray-400 hover:text-red-400"
+                  aria-label="삭제"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {hasChildren && expanded && children.map((c) => renderDocNode(c, depth + 1))}
+      </div>
+    );
   };
 
   return (
@@ -250,6 +360,27 @@ export default function Sidebar({
               </div>
             );
           })
+        )}
+
+        {activeProjectId && (
+          <>
+            <div className="flex items-center justify-between px-3 pt-6 pb-1">
+              <p className="text-xs uppercase tracking-wider text-gray-500">문서</p>
+              <button
+                type="button"
+                onClick={() => onAddDocument()}
+                className="p-1 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                aria-label="문서 추가"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {documents.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-gray-500">문서가 없습니다.</p>
+            ) : (
+              (docChildren.get(null) ?? []).map((d) => renderDocNode(d, 0))
+            )}
+          </>
         )}
       </nav>
 

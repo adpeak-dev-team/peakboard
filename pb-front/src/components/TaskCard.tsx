@@ -4,14 +4,14 @@ import { forwardRef, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
-import { Search, Plus, Trash2, MinusCircle, Star, Pencil, Check, X } from 'lucide-react';
+import { Search, Plus, Trash2, MinusCircle, Star, FileText } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface TaskCardCallbacks {
   onDelete: (taskId: string) => void;
   onSearch?: (taskId: string) => void;
   onAddSub?: (taskId: string) => void;
-  onRename?: (taskId: string, newTitle: string) => void;
+  onOpenDocument?: (taskId: string) => void;
 }
 
 interface TaskCardProps extends TaskCardCallbacks {
@@ -52,12 +52,7 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
       onDelete,
       onSearch,
       onAddSub,
-      isEditing = false,
-      editValue = '',
-      onEditChange,
-      onEditSave,
-      onEditCancel,
-      onStartEdit,
+      onOpenDocument,
     },
     ref
   ) {
@@ -131,7 +126,23 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
             className="flex items-center gap-1 shrink-0"
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {isEditing ? (
+            <button
+              type="button"
+              onClick={() => onSearch?.(task.id)}
+              className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+              aria-label="할 일 보기"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenDocument?.(task.id)}
+              className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+              aria-label="문서 열기"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+            {!isDone && (
               <>
                 <button
                   type="button"
@@ -204,7 +215,7 @@ export default function TaskCard({
   onDelete,
   onSearch,
   onAddSub,
-  onRename,
+  onOpenDocument,
 }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -252,13 +263,7 @@ export default function TaskCard({
       onDelete={onDelete}
       onSearch={onSearch}
       onAddSub={onAddSub}
-      onRename={onRename}
-      isEditing={isEditing}
-      editValue={editValue}
-      onEditChange={setEditValue}
-      onEditSave={handleSave}
-      onEditCancel={handleCancel}
-      onStartEdit={handleStartEdit}
+      onOpenDocument={onOpenDocument}
     />
   );
 }

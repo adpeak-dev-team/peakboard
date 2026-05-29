@@ -4,6 +4,7 @@ import projectRoutes from './api/projects.js';
 import taskRoutes from './api/tasks.js';
 import folderRoutes from './api/folders.js';
 import todoRoutes from './api/todos.js';
+import documentRoutes from './api/documents.js';
 
 const apiRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/test', async () => {
@@ -26,6 +27,7 @@ const apiRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(taskRoutes);
   await fastify.register(folderRoutes);
   await fastify.register(todoRoutes);
+  await fastify.register(documentRoutes);
 };
 
 export default apiRoutes;
