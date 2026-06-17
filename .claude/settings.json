@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"pb-front/src/app/\\(app\\)\")",
+      "Bash(mkdir -p \"pb-front/src/app/\\(app\\)\")",
+      "Bash(mv \"pb-front/src/\\(app\\)/app/\"* \"pb-front/src/app/\\(app\\)/\")",
+      "Bash(rm -rf \"pb-front/src/\\(app\\)/app\")",
+      "Bash(rmdir \"pb-front/src/\\(app\\)\")"
     ]
   }
 }

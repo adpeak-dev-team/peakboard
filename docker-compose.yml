@@ -3,11 +3,13 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: "rkwkrh13!#"
+    ports:
+      - "3308:3306" # [내 PC 접속용 포트]:[컨테이너 내부 포트]
     volumes:
       - mysql_data:/var/lib/mysql
       - ./pb-back/lib/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prkwkrh13!#"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prkwkrh13!#" ]
       interval: 10s
       timeout: 5s
       retries: 10
