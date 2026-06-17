@@ -4,14 +4,13 @@ import { forwardRef, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
-import { Search, Plus, Trash2, MinusCircle, Star, FileText, Check, X, Pencil } from 'lucide-react';
+import { Search, Plus, Trash2, MinusCircle, Star, Check, X, Pencil } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface TaskCardCallbacks {
   onDelete: (taskId: string) => void;
   onSearch?: (taskId: string) => void;
   onAddSub?: (taskId: string) => void;
-  onOpenDocument?: (taskId: string) => void;
   onRename?: (taskId: string, newTitle: string) => void;
 }
 
@@ -53,7 +52,6 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
       onDelete,
       onSearch,
       onAddSub,
-      onOpenDocument,
       isEditing = false,
       editValue = '',
       onEditChange,
@@ -141,72 +139,54 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
             >
               <Search className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={() => onOpenDocument?.(task.id)}
-              className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
-              aria-label="문서 열기"
-            >
-              <FileText className="w-3.5 h-3.5" />
-            </button>
-            {!isDone ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onEditSave}
-                  className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
-                  aria-label="저장"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onEditCancel}
-                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                  aria-label="취소"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onSearch?.(task.id)}
-                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                  aria-label="할 일 보기"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                </button>
-                {!isDone && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={onStartEdit}
-                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
-                      aria-label="이름 수정"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onAddSub?.(task.id)}
-                      className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      aria-label="할 일 추가"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(task.id)}
-                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                      aria-label="삭제"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-              </>
+{!isDone && (
+              isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onEditSave}
+                    className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
+                    aria-label="저장"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onEditCancel}
+                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                    aria-label="취소"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={onStartEdit}
+                    className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                    aria-label="이름 수정"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddSub?.(task.id)}
+                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                    aria-label="할 일 추가"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(task.id)}
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                    aria-label="삭제"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )
             )}
           </div>
         </div>
@@ -222,7 +202,6 @@ export default function TaskCard({
   onDelete,
   onSearch,
   onAddSub,
-  onOpenDocument,
   onRename,
 }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -271,7 +250,13 @@ export default function TaskCard({
       onDelete={onDelete}
       onSearch={onSearch}
       onAddSub={onAddSub}
-      onOpenDocument={onOpenDocument}
+      onRename={onRename}
+      isEditing={isEditing}
+      editValue={editValue}
+      onEditChange={setEditValue}
+      onEditSave={handleSave}
+      onEditCancel={handleCancel}
+      onStartEdit={handleStartEdit}
     />
   );
 }

@@ -775,9 +775,6 @@ export default function PeakBoard() {
                             onAddSub={(taskId) =>
                               setAddTodoTarget({ kind: 'task', id: taskId })
                             }
-                            onOpenDocument={(taskId) =>
-                              handleOpenAttachedDocument('task', taskId)
-                            }
                           />
                         ))}
                       </SortableContext>
