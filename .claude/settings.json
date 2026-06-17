@@ -6,7 +6,8 @@
       "Bash(mkdir -p \"pb-front/src/app/\\(app\\)\")",
       "Bash(mv \"pb-front/src/\\(app\\)/app/\"* \"pb-front/src/app/\\(app\\)/\")",
       "Bash(rm -rf \"pb-front/src/\\(app\\)/app\")",
-      "Bash(rmdir \"pb-front/src/\\(app\\)\")"
+      "Bash(rmdir \"pb-front/src/\\(app\\)\")",
+      "Bash(netstat -ano)"
     ]
   }
 }
