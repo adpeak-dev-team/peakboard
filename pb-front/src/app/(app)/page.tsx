@@ -234,6 +234,7 @@ export default function PeakBoard() {
   }, []);
 
   // 문서 열기/닫기에 맞춰 URL 동기화 (마운트 첫 실행은 건너뜀 — 위 진입 처리와 충돌 방지)
+  const dragStartSnapshotRef = useRef<TaskDTO[]>([]);
   const docUrlSyncRef = useRef(false);
   useEffect(() => {
     if (!docUrlSyncRef.current) {
@@ -559,6 +560,9 @@ export default function PeakBoard() {
     const id = event.active.id as string;
     const task = tasks.find((t) => t.id === id) ?? null;
     setActiveDragTask(task);
+    dragStartSnapshotRef.current = activeProjectId
+      ? (qc.getQueryData<TaskDTO[]>(workQueryKeys.tasks(activeProjectId)) ?? [])
+      : [];
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -618,9 +622,8 @@ export default function PeakBoard() {
 
     // 컬럼 간 이동 시 status를 DB에 PATCH
     const currentTasks = qc.getQueryData<TaskDTO[]>(workQueryKeys.tasks(activeProjectId)) ?? [];
-    const originalTasks = tasksQuery.data ?? [];
     const movedTask = currentTasks.find((t) => t.id === activeId);
-    const originalTask = originalTasks.find((t) => t.id === activeId);
+    const originalTask = dragStartSnapshotRef.current.find((t) => t.id === activeId);
     if (movedTask && originalTask && movedTask.status !== originalTask.status) {
       updateTaskMutation.mutate(
         { taskId: activeId, patch: { status: movedTask.status } },
@@ -746,7 +749,7 @@ export default function PeakBoard() {
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
             >
-              <div className="flex flex-col lg:flex-row gap-6 h-full items-start">
+              <div className="flex flex-col lg:flex-row gap-6 h-full w-full items-start">
                 {COLUMNS.map((col) => {
                   const colTasks = activeProject.tasks.filter((t) => t.status === col.status);
                   return (

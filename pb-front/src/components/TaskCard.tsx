@@ -4,7 +4,7 @@ import { forwardRef, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
-import { Search, Plus, Trash2, MinusCircle, Star, FileText } from 'lucide-react';
+import { Search, Plus, Trash2, MinusCircle, Star, FileText, Check, X } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface TaskCardCallbacks {
@@ -53,6 +53,12 @@ export const TaskCardView = forwardRef<HTMLDivElement, TaskCardViewProps>(
       onSearch,
       onAddSub,
       onOpenDocument,
+      isEditing = false,
+      editValue = '',
+      onEditChange,
+      onEditSave,
+      onEditCancel,
+      onStartEdit,
     },
     ref
   ) {
