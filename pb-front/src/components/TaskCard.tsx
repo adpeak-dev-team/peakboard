@@ -4,7 +4,7 @@ import { forwardRef, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
-import { Search, Plus, Trash2, MinusCircle, Star, FileText, Check, X } from 'lucide-react';
+import { Search, Plus, Trash2, MinusCircle, Star, FileText, Check, X, Pencil } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface TaskCardCallbacks {
@@ -12,6 +12,7 @@ interface TaskCardCallbacks {
   onSearch?: (taskId: string) => void;
   onAddSub?: (taskId: string) => void;
   onOpenDocument?: (taskId: string) => void;
+  onRename?: (taskId: string, newTitle: string) => void;
 }
 
 interface TaskCardProps extends TaskCardCallbacks {
@@ -222,6 +223,7 @@ export default function TaskCard({
   onSearch,
   onAddSub,
   onOpenDocument,
+  onRename,
 }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
