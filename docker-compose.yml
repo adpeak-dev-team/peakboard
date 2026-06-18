@@ -1,30 +1,15 @@
 services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: "rkwkrh13!#"
-    ports:
-      - "3308:3306" # [내 PC 접속용 포트]:[컨테이너 내부 포트]
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./pb-back/lib/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prkwkrh13!#" ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   backend:
     build: ./pb-back
     environment:
-      HOST: mysql
+      HOST: shared-mysql # ★ 메인 DB의 컨테이너 이름으로 변경
       DBPWD: "rkwkrh13!#"
-      SHEMA: peakboard
+      SCHEMA: peakboard # (오타 수정 권장)
       PORT: 3050
-    depends_on:
-      mysql:
-        condition: service_healthy
+    # depends_on: mysql 은 파일이 분리되었으므로 삭제해야 에러가 안 나!
+    networks:
+      - shared-network # 외부망 연결
+      - default # 프론트와의 내부 통신용
 
   frontend:
     build: ./pb-front
@@ -34,6 +19,9 @@ services:
       - backend
     ports:
       - "3030:3030"
+    networks:
+      - default # 프론트는 백엔드하고만 통신하면 되니 굳이 shared-network에 안 넣어도 됨
 
-volumes:
-  mysql_data:
+networks:
+  shared-network:
+    external: true
