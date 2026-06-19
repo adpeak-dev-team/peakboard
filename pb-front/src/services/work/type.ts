@@ -1,159 +1,183 @@
-import type { Folder, Project, Task, TaskStatus } from '@/lib/types';
-
-export interface ProjectDTO {
+// ===== Board (팀 보드) =====
+export interface BoardDTO {
   id: string;
   name: string;
+  teamType: 'video' | 'dev';
+  position: number;
+}
+
+// ===== Project (보드 내 프로젝트 — 주로 개발팀 탭) =====
+export interface ProjectDTO {
+  id: string;
+  boardId: string;
+  name: string;
+  position: number;
 }
 
 export interface CreateProjectInput {
+  boardId: string;
   name: string;
 }
 
 export interface UpdateProjectInput {
   projectId: string;
+  boardId: string;
   name: string;
 }
 
 export interface DeleteProjectInput {
   projectId: string;
+  boardId: string;
 }
 
-export type TaskDTO = Task;
-
-export interface CreateTaskInput {
-  projectId: string;
-  title: string;
-}
-
-export interface UpdateTaskInput {
-  taskId: string;
-  patch: {
-    title?: string;
-    status?: TaskStatus;
-    position?: number;
-  };
-}
-
-export interface DeleteTaskInput {
-  taskId: string;
-}
-
-export type FolderDTO = Folder;
-
-export interface CreateFolderInput {
-  name: string;
-}
-
-export interface DeleteFolderInput {
-  folderId: string;
-}
-
-export interface UpdateFolderInput {
-  folderId: string;
-  name: string;
-}
-
-export interface TodoDTO {
+// ===== BoardItem (표의 한 행 = 달력의 한 일정) =====
+export interface BoardItemDTO {
   id: string;
-  taskId: string | null;
-  folderId: string | null;
+  boardId: string;
+  projectId: string | null;
   title: string;
-  description: string;
+  groupKey: string;
+  eventDate: string | null; // 'YYYY-MM-DD'
   assignee: string;
-  starred: boolean;
+  notes: string;
+  done: boolean;
+  fields: Record<string, string>; // 팀별 추가 컬럼 값
   position: number;
-  createdAt: number;
 }
 
-export interface CreateTodoInput {
-  parent: { kind: 'task' | 'folder'; id: string };
-  title: string;
-  description?: string;
-  assignee: string;
-}
-
-export interface UpdateTodoInput {
-  todoId: string;
-  kind: 'task' | 'folder';
-  patch: {
-    title?: string;
-    description?: string;
-    assignee?: string;
-    starred?: boolean;
-    position?: number;
-    taskId?: string | null;
-    folderId?: string | null;
-  };
-}
-
-export interface DeleteTodoInput {
-  todoId: string;
-  kind: 'task' | 'folder';
-}
-
-// 문서(documents). content 는 TipTap JSON (Phase 2). 트리 목록은 메타만.
-export interface DocumentSummaryDTO {
-  id: string;
-  projectId: string;
-  parentId: string | null;
-  attachedTaskId: string | null;
-  attachedTodoId: string | null;
-  title: string;
-  icon: string;
-  position: number;
-  updatedAt: string;
-}
-
-export interface DocumentDTO extends DocumentSummaryDTO {
-  content: unknown | null;
-  createdByName: string;
-  updatedByName: string;
-  createdAt: string;
-}
-
-export interface CreateDocumentInput {
-  projectId: string;
+export interface CreateBoardItemInput {
+  boardId: string;
+  groupKey: string;
+  projectId?: string | null;
   title?: string;
-  icon?: string;
-  parentId?: string | null;
-  createdByName?: string;
+  eventDate?: string | null;
+  assignee?: string;
+  notes?: string;
+  fields?: Record<string, string>;
 }
 
-export interface UpdateDocumentInput {
-  documentId: string;
-  patch: {
-    title?: string;
-    icon?: string;
-    content?: unknown;
-    parentId?: string | null;
-    position?: number;
-    updatedByName?: string;
-  };
+export type BoardItemPatch = Partial<{
+  projectId: string | null;
+  title: string;
+  groupKey: string;
+  eventDate: string | null;
+  assignee: string;
+  notes: string;
+  done: boolean;
+  fields: Record<string, string>;
+  position: number;
+}>;
+
+export interface UpdateBoardItemInput {
+  itemId: string;
+  boardId: string; // 캐시 무효화용
+  patch: BoardItemPatch;
 }
 
-export interface DeleteDocumentInput {
-  documentId: string;
+export interface DeleteBoardItemInput {
+  itemId: string;
+  boardId: string;
 }
 
-export interface AttachDocumentInput {
-  kind: 'task' | 'todo';
+export interface ReorderBoardItemsInput {
+  boardId: string;
+  groupKey: string;
+  orderedIds: string[];
+}
+
+// ===== CompanyEvent (연차 / 회사 일정 / 공휴일 / 개인 todo) =====
+export type EventCategory = 'leave' | 'company' | 'holiday' | 'todo';
+
+export interface EventDTO {
   id: string;
-  createdByName: string;
+  date: string; // 'YYYY-MM-DD'
+  category: EventCategory;
+  title: string;
+  done: boolean;
+}
+
+export interface CreateEventInput {
+  date: string;
+  category: EventCategory;
+  title: string;
+}
+
+export interface UpdateEventInput {
+  id: string;
+  patch: Partial<{ date: string; category: EventCategory; title: string; done: boolean }>;
+}
+
+export interface DeleteEventInput {
+  id: string;
+}
+
+// ===== Employee (직원 / 회원) =====
+export interface EmployeeDTO {
+  id: string;
+  name: string;
+  department: string;
+  position: string;
+  email: string;
+  phone: string;
+  hireDate: string | null; // 입사일 'YYYY-MM-DD'
+  leaveTotal: number; // 연 연차 부여 일수
+}
+
+export type EmployeePatch = Partial<Omit<EmployeeDTO, 'id'>>;
+
+export interface UpdateEmployeeInput {
+  id: string;
+  patch: EmployeePatch;
+}
+
+// ===== LeaveRequest (연차 신청) =====
+export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+
+export interface LeaveRequestDTO {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+  status: LeaveStatus;
+}
+
+export interface CreateLeaveInput {
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+}
+
+// ===== ColumnOption (표 컬럼 select 값/색상 커스터마이즈) =====
+export interface ColumnOptionDTO {
+  id: string;
+  columnKey: string;
+  value: string;
+  color: string;
+  position: number;
+}
+
+export interface UpsertColumnOptionInput {
+  boardId: string;
+  columnKey: string;
+  value: string;
+  color: string;
+  position?: number;
 }
 
 export const workQueryKeys = {
   all: ['work'] as const,
-  projects: () => [...workQueryKeys.all, 'projects'] as const,
-  tasksAll: () => [...workQueryKeys.all, 'tasks'] as const,
-  tasks: (projectId: string) => [...workQueryKeys.tasksAll(), projectId] as const,
-  foldersAll: () => [...workQueryKeys.all, 'folders'] as const,
-  todosAll: () => [...workQueryKeys.all, 'todos'] as const,
-  todos: (projectId: string) => [...workQueryKeys.todosAll(), projectId] as const,
-  folderTodosAll: () => [...workQueryKeys.all, 'folderTodos'] as const,
-  documentsAll: () => [...workQueryKeys.all, 'documents'] as const,
-  documents: (projectId: string) => [...workQueryKeys.documentsAll(), projectId] as const,
-  document: (documentId: string) =>
-    [...workQueryKeys.all, 'document', documentId] as const,
+  boards: () => [...workQueryKeys.all, 'boards'] as const,
+  columnOptions: (boardId: string) => [...workQueryKeys.all, 'columnOptions', boardId] as const,
+  boardItemsAll: () => [...workQueryKeys.all, 'boardItems'] as const,
+  boardItems: (boardId: string) => [...workQueryKeys.boardItemsAll(), boardId] as const,
+  projectsAll: () => [...workQueryKeys.all, 'projects'] as const,
+  projects: (boardId: string) => [...workQueryKeys.projectsAll(), boardId] as const,
+  events: () => [...workQueryKeys.all, 'events'] as const,
+  employees: () => [...workQueryKeys.all, 'employees'] as const,
+  leaveRequests: () => [...workQueryKeys.all, 'leaveRequests'] as const,
 };
-
-export type { Folder, Project, Task, TaskStatus };
