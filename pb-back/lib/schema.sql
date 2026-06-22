@@ -1,244 +1,158 @@
 -- =============================================================================
--- PeakBoard 스키마 (MySQL 8.x / MariaDB 10.5+)
+-- PeakBoard 스키마 (HR 프로젝트관리 리뉴얼) — MySQL 8.x
 --
--- 설계 원칙
--- 1. user 테이블은 지금 만들지만, FK는 NULL 허용으로 두어 "범용" 모드에서도
---    동작 가능. user 시스템 활성화 시 백필 → NOT NULL 로 ALTER.
--- 2. 폴더는 (project_id, owner_user_id) 조합으로 user별 소유. owner NULL이면
---    "범용 폴더"(현재 모드)로 동작.
--- 3. 프로젝트는 관리자(role='admin')가 생성, project_members 로 멤버 관리.
--- 4. todos 는 task_id 또는 folder_id 둘 중 하나에만 속함 (CHECK 제약).
--- 5. position 은 INT — 정렬 변경 시 가운데 끼워넣기를 위해 클라이언트에서
---    충분히 띄워서(예: 1000, 2000, 3000) 발급 권장. 빽빽해지면 주기적 재정렬.
--- 6. DATETIME(3) — 밀리초 정밀도. 프런트 Date.now()와 호환.
--- 7. utf8mb4 / utf8mb4_unicode_ci — 한글·이모지 안전.
+-- 이 파일은 docker-compose 의 mysql 초기화 스크립트로 사용된다(빈 볼륨일 때 1회 실행).
+-- 기존 DB 에 적용할 때는 pb-back/lib/migrations/002_boards.sql 사용.
+--
+-- 구조
+--   boards       : 팀 단위 보드 (영상팀=video, 개발팀=dev)
+--   projects     : 보드(주로 개발팀) 내 프로젝트. 탭으로 표시.
+--   board_items  : 표의 한 행(= 달력의 한 일정). 팀별 가변 컬럼은 fields(JSON) 보관.
+--
+-- 설계 메모
+--   - group_key : 영상팀(작업중/자료대기/보류), 개발팀(해야할일/진행중/완료) 분류.
+--   - event_date: 달력 뷰 배치 기준. NULL 허용(날짜 미정).
+--   - fields    : 팀별 추가 컬럼(구분/브랜드/PM/컨펌상태/자료유형/라이브/산출물 등).
+--   - project_id: 개발팀 아이템이 속한 프로젝트(영상팀은 NULL).
+--   - 직원/연차/출퇴근(HR) 테이블은 후속 단계에서 추가 예정.
 -- =============================================================================
 
-CREATE DATABASE peakboard DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS peakboard DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;
 USE peakboard;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS documents;
-DROP TABLE IF EXISTS todos;
-DROP TABLE IF EXISTS folders;
-DROP TABLE IF EXISTS tasks;
-DROP TABLE IF EXISTS project_members;
-DROP TABLE IF EXISTS projects;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS column_options;
+DROP TABLE IF EXISTS board_items;
+DROP TABLE IF EXISTS board_projects;
+DROP TABLE IF EXISTS boards;
+DROP TABLE IF EXISTS company_events;
+DROP TABLE IF EXISTS leave_requests;
+DROP TABLE IF EXISTS employees;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- =============================================================================
--- users
---   role 'admin' 은 프로젝트 생성 권한 보유.
---   범용 모드에서는 비어있어도 OK (다른 테이블의 user FK는 NULL 허용).
--- =============================================================================
-CREATE TABLE users (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  email           VARCHAR(255)    NOT NULL,
-  name            VARCHAR(100)    NOT NULL,
-  password_hash   VARCHAR(255)        NULL,  -- OAuth 전용이면 NULL 허용
-  role            ENUM('admin', 'member') NOT NULL DEFAULT 'member',
-  created_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                  ON UPDATE CURRENT_TIMESTAMP(3),
+CREATE TABLE boards (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(100)    NOT NULL,
+  team_type   ENUM('video','dev') NOT NULL,
+  position    INT             NOT NULL DEFAULT 0,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE board_projects (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  board_id    BIGINT UNSIGNED NOT NULL,
+  name        VARCHAR(100)    NOT NULL,
+  position    INT             NOT NULL DEFAULT 0,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_users_email (email)
+  KEY idx_board_projects_board_pos (board_id, position),
+  CONSTRAINT fk_board_projects_board
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================================================
--- projects
---   created_by = 프로젝트 생성한 관리자 user id.
---   user 시스템 활성화 전엔 NULL 허용.
--- =============================================================================
-CREATE TABLE projects (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  name            VARCHAR(100)    NOT NULL,
-  created_by      BIGINT UNSIGNED     NULL,  -- 추후 NOT NULL 로 ALTER
-  created_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                  ON UPDATE CURRENT_TIMESTAMP(3),
+CREATE TABLE board_items (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  board_id    BIGINT UNSIGNED NOT NULL,
+  project_id  BIGINT UNSIGNED     NULL,
+  title       VARCHAR(255)    NOT NULL DEFAULT '',
+  group_key   VARCHAR(40)     NOT NULL DEFAULT '',
+  event_date  DATE                NULL,
+  assignee    VARCHAR(100)    NOT NULL DEFAULT '',
+  notes       TEXT                NULL,
+  done        TINYINT(1)      NOT NULL DEFAULT 0,
+  fields      JSON                NULL,
+  position    INT             NOT NULL DEFAULT 0,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                              ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_projects_created_by (created_by),
-  CONSTRAINT fk_projects_created_by
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  KEY idx_board_items_board_group_pos (board_id, group_key, position),
+  KEY idx_board_items_board_date (board_id, event_date),
+  KEY idx_board_items_project (project_id, group_key, position),
+  CONSTRAINT fk_board_items_board
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+  CONSTRAINT fk_board_items_project
+    FOREIGN KEY (project_id) REFERENCES board_projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================================================
--- project_members
---   관리자가 프로젝트에 회원을 초대해서 관리.
---   role 은 "이 프로젝트 안에서의" 역할 — 전역 role 과 별개.
---   PK 는 (project_id, user_id) — 한 사용자는 한 프로젝트에 1번만 속함.
--- =============================================================================
-CREATE TABLE project_members (
-  project_id      BIGINT UNSIGNED NOT NULL,
-  user_id         BIGINT UNSIGNED NOT NULL,
-  role            ENUM('admin', 'member') NOT NULL DEFAULT 'member',
-  invited_by      BIGINT UNSIGNED     NULL,
-  joined_at       DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (project_id, user_id),
-  KEY idx_pm_user (user_id),
-  CONSTRAINT fk_pm_project
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pm_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pm_invited_by
-    FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================================================
--- tasks
---   status: todo / inProgress / done (프런트 TaskStatus 와 일치)
---   position: 프로젝트 단위 정렬 (컬럼 필터는 status로). 빈도 낮은 재정렬을 위해
---     클라이언트가 1000, 2000, 3000 형태로 띄워서 발급 권장.
--- =============================================================================
-CREATE TABLE tasks (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  project_id      BIGINT UNSIGNED NOT NULL,
-  title           VARCHAR(255)    NOT NULL,
-  status          ENUM('todo', 'inProgress', 'done') NOT NULL DEFAULT 'todo',
-  position        INT             NOT NULL DEFAULT 0,
-  created_by      BIGINT UNSIGNED     NULL,
-  created_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                  ON UPDATE CURRENT_TIMESTAMP(3),
+-- 표 컬럼 select 값/색상 커스터마이즈
+CREATE TABLE column_options (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  board_id    BIGINT UNSIGNED NOT NULL,
+  column_key  VARCHAR(40)     NOT NULL,
+  value       VARCHAR(100)    NOT NULL,
+  color       VARCHAR(80)     NOT NULL DEFAULT '',
+  position    INT             NOT NULL DEFAULT 0,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_tasks_project_status_pos (project_id, status, position),
-  KEY idx_tasks_created_by (created_by),
-  CONSTRAINT fk_tasks_project
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tasks_created_by
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  UNIQUE KEY uk_column_options (board_id, column_key, value),
+  CONSTRAINT fk_column_options_board
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================================================
--- folders
---   "개인 폴더" — owner_user_id 로 user 별 소유.
---   범용 모드에서는 owner_user_id = NULL (모두 공유).
---   같은 프로젝트 안에서 같은 user 가 같은 이름 폴더를 중복 생성 못 하도록
---   유니크 키 (project_id, owner_user_id, name). owner NULL인 경우는
---   MySQL NULL 다중 허용 정책에 따라 여러 NULL이 충돌하지 않음(원하면 OK).
--- =============================================================================
-CREATE TABLE folders (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  project_id      BIGINT UNSIGNED     NULL,  -- 범용 모드에서는 NULL. 추후 NOT NULL 로 ALTER
-  owner_user_id   BIGINT UNSIGNED     NULL,  -- 추후 NOT NULL 로 ALTER
-  name            VARCHAR(100)    NOT NULL,
-  position        INT             NOT NULL DEFAULT 0,
-  created_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                  ON UPDATE CURRENT_TIMESTAMP(3),
+-- 시드: 영상팀 / 개발팀
+INSERT INTO boards (name, team_type, position) VALUES
+  ('영상팀', 'video', 0),
+  ('개발팀', 'dev', 1);
+
+-- 시드: 개발팀 기본 프로젝트
+INSERT INTO board_projects (board_id, name, position)
+SELECT id, '기본 프로젝트', 0 FROM boards WHERE team_type = 'dev';
+
+-- 직원 (회원관리)
+CREATE TABLE employees (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(100)    NOT NULL DEFAULT '',
+  department  VARCHAR(50)     NOT NULL DEFAULT '',
+  position    VARCHAR(50)     NOT NULL DEFAULT '',
+  email       VARCHAR(255)    NOT NULL DEFAULT '',
+  phone       VARCHAR(50)     NOT NULL DEFAULT '',
+  hire_date   DATE                NULL,
+  leave_total INT             NOT NULL DEFAULT 15,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                              ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_folders_owner_pos (owner_user_id, position),
-  UNIQUE KEY uk_folders_owner_name (owner_user_id, name),
-  CONSTRAINT fk_folders_owner
-    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY idx_employees_dept (department)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================================================
--- todos
---   task_id 또는 folder_id 둘 중 정확히 하나만 채워짐.
---   "이동" 은 row 의 task_id ↔ folder_id 를 토글하는 UPDATE 한 번으로 처리.
---   assignee 는 자유 입력 텍스트. user 시스템 도입 시 assignee_user_id 컬럼
---   추가하고 백필 → assignee 컬럼 deprecate 또는 보조 라벨로 유지.
--- =============================================================================
-CREATE TABLE todos (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  task_id         BIGINT UNSIGNED     NULL,
-  folder_id       BIGINT UNSIGNED     NULL,
-  title           VARCHAR(255)    NOT NULL,
-  description     TEXT                NULL,
-  assignee        VARCHAR(100)    NOT NULL DEFAULT '',  -- 자유 입력 (추후 FK 마이그레이션)
-  starred         TINYINT(1)      NOT NULL DEFAULT 0,
-  position        INT             NOT NULL DEFAULT 0,
-  created_by      BIGINT UNSIGNED     NULL,
-  created_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                  ON UPDATE CURRENT_TIMESTAMP(3),
+CREATE TABLE leave_requests (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  employee_id  BIGINT UNSIGNED NOT NULL,
+  start_date   DATE            NOT NULL,
+  end_date     DATE            NOT NULL,
+  days         INT             NOT NULL DEFAULT 1,
+  reason       VARCHAR(255)    NOT NULL DEFAULT '',
+  status       ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  created_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                               ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_todos_task_pos (task_id, position),
-  KEY idx_todos_folder_pos (folder_id, position),
-  KEY idx_todos_created_by (created_by),
-  CONSTRAINT fk_todos_task
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_todos_folder
-    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
-  CONSTRAINT fk_todos_created_by
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-  -- 정확히 한 쪽에만 속해야 함
-  CONSTRAINT chk_todos_exactly_one_parent CHECK (
-    (task_id IS NOT NULL AND folder_id IS NULL)
-    OR (task_id IS NULL AND folder_id IS NOT NULL)
-  )
+  KEY idx_leave_employee (employee_id),
+  CONSTRAINT fk_leave_employee
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO employees (name, department, position, email, phone) VALUES
+  ('김영상', '영상팀', '팀장', 'video.kim@peakboard.io', '010-1000-0001'),
+  ('이편집', '영상팀', '대리', 'video.lee@peakboard.io', '010-1000-0002'),
+  ('박촬영', '영상팀', '사원', 'video.park@peakboard.io', '010-1000-0003'),
+  ('최개발', '개발팀', '팀장', 'dev.choi@peakboard.io', '010-2000-0001'),
+  ('정코드', '개발팀', '대리', 'dev.jung@peakboard.io', '010-2000-0002'),
+  ('한서버', '개발팀', '사원', 'dev.han@peakboard.io', '010-2000-0003');
 
--- =============================================================================
--- documents
---   Notion 스타일 문서. 한 테이블로 두 가지 사용 모드를 모두 처리한다.
---   1) "독립 문서 트리" — attached_task_id / attached_todo_id 가 모두 NULL.
---      parent_id 셀프참조로 폴더형 계층 구성. position 으로 형제 정렬.
---   2) "task/todo 첨부 문서" — attached_task_id 또는 attached_todo_id 가 채워짐.
---      이때 parent_id 는 NULL. 카드별로 1개 첨부 (tasks/todos 쪽에서 UNIQUE 강제).
---
---   content_json: Phase 1~2 동안 TipTap JSON 직접 저장 (LONGTEXT).
---   yjs_state:    Phase 3 부터 Yjs binary CRDT state 저장 (LONGBLOB).
---                 둘 다 NULL 가능 — 빈 문서 신규 생성 시.
---   created_by_name / updated_by_name: 게스트 이름 (sessionStorage 기반).
---                 추후 users 활성화 시 *_user_id 컬럼 추가하고 백필.
--- =============================================================================
-CREATE TABLE documents (
-  id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  project_id          BIGINT UNSIGNED NOT NULL,
-  parent_id           BIGINT UNSIGNED     NULL,
-  attached_task_id    BIGINT UNSIGNED     NULL,
-  attached_todo_id    BIGINT UNSIGNED     NULL,
-  title               VARCHAR(255)    NOT NULL DEFAULT '',
-  icon                VARCHAR(16)     NOT NULL DEFAULT '',
-  position            INT             NOT NULL DEFAULT 0,
-  content_json        LONGTEXT            NULL,
-  yjs_state           LONGBLOB            NULL,
-  created_by_name     VARCHAR(100)    NOT NULL DEFAULT '',
-  updated_by_name     VARCHAR(100)    NOT NULL DEFAULT '',
-  created_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  updated_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                                      ON UPDATE CURRENT_TIMESTAMP(3),
+-- 연차 / 회사 일정 (일정관리 통합 캘린더)
+CREATE TABLE company_events (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  event_date  DATE            NOT NULL,
+  category    ENUM('leave','company','holiday','todo') NOT NULL DEFAULT 'company',
+  title       VARCHAR(255)    NOT NULL DEFAULT '',
+  done        TINYINT(1)      NOT NULL DEFAULT 0,
+  created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                              ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY idx_documents_project_parent_pos (project_id, parent_id, position),
-  UNIQUE KEY uk_documents_task (attached_task_id),
-  UNIQUE KEY uk_documents_todo (attached_todo_id),
-  CONSTRAINT fk_documents_project
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-  CONSTRAINT fk_documents_parent
-    FOREIGN KEY (parent_id) REFERENCES documents(id) ON DELETE CASCADE,
-  CONSTRAINT fk_documents_task
-    FOREIGN KEY (attached_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_documents_todo
-    FOREIGN KEY (attached_todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-  -- 첨부 문서면 parent_id 가 비어야 하고, 두 attached_* 컬럼은 동시에 채워질 수 없음
-  CONSTRAINT chk_documents_attach_shape CHECK (
-       (attached_task_id IS NULL AND attached_todo_id IS NULL)
-    OR (attached_task_id IS NOT NULL AND attached_todo_id IS NULL AND parent_id IS NULL)
-    OR (attached_task_id IS NULL AND attached_todo_id IS NOT NULL AND parent_id IS NULL)
-  )
+  KEY idx_company_events_date (event_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- =============================================================================
--- 추후 user 시스템 활성화 시 ALTER 예시 (참고용 — 지금 실행 X)
--- =============================================================================
--- 1) 기존 NULL row 들을 admin 계정으로 백필:
---    UPDATE projects SET created_by = <admin_id> WHERE created_by IS NULL;
---    UPDATE folders  SET owner_user_id = <admin_id> WHERE owner_user_id IS NULL;
---
--- 2) NOT NULL 로 잠그기:
---    ALTER TABLE projects MODIFY created_by    BIGINT UNSIGNED NOT NULL;
---    ALTER TABLE folders  MODIFY owner_user_id BIGINT UNSIGNED NOT NULL;
---
--- 3) todos.assignee 를 user FK 로 전환:
---    ALTER TABLE todos ADD COLUMN assignee_user_id BIGINT UNSIGNED NULL AFTER assignee,
---      ADD KEY idx_todos_assignee_user (assignee_user_id),
---      ADD CONSTRAINT fk_todos_assignee_user
---        FOREIGN KEY (assignee_user_id) REFERENCES users(id) ON DELETE SET NULL;
---    -- 백필: assignee 텍스트 → users 매핑 (이름/이메일 기반 수동 또는 스크립트)
---    -- 검증 후 assignee 컬럼 DROP (또는 라벨용으로 유지)

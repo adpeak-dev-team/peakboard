@@ -1,10 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql_con } from '../lib/db.js';
+import boardRoutes from './api/boards.js';
+import boardItemRoutes from './api/boardItems.js';
 import projectRoutes from './api/projects.js';
-import taskRoutes from './api/tasks.js';
-import folderRoutes from './api/folders.js';
-import todoRoutes from './api/todos.js';
-import documentRoutes from './api/documents.js';
+import eventRoutes from './api/events.js';
+import employeeRoutes from './api/employees.js';
+import leaveRoutes from './api/leave.js';
+import columnOptionRoutes from './api/columnOptions.js';
 
 const apiRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/test', async () => {
@@ -23,11 +25,13 @@ const apiRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  await fastify.register(boardRoutes);
   await fastify.register(projectRoutes);
-  await fastify.register(taskRoutes);
-  await fastify.register(folderRoutes);
-  await fastify.register(todoRoutes);
-  await fastify.register(documentRoutes);
+  await fastify.register(boardItemRoutes);
+  await fastify.register(eventRoutes);
+  await fastify.register(employeeRoutes);
+  await fastify.register(leaveRoutes);
+  await fastify.register(columnOptionRoutes);
 };
 
 export default apiRoutes;

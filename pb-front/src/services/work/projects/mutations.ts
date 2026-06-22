@@ -1,20 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createProject, updateProject, deleteProject } from './api';
-import {
-  workQueryKeys,
-  type CreateProjectInput,
-  type UpdateProjectInput,
-  type DeleteProjectInput,
-  type ProjectDTO,
-} from '../type';
+import { createProject, deleteProject, updateProject } from './api';
+import { workQueryKeys, type ProjectDTO } from '../type';
 
 export function useCreateProjectMutation() {
   const qc = useQueryClient();
-
-  return useMutation<ProjectDTO, Error, CreateProjectInput>({
+  return useMutation({
     mutationFn: createProject,
     onSuccess: (created) => {
-      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(), (prev) =>
+      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(created.boardId), (prev) =>
         prev ? [...prev, created] : [created]
       );
     },
@@ -23,12 +16,11 @@ export function useCreateProjectMutation() {
 
 export function useUpdateProjectMutation() {
   const qc = useQueryClient();
-
-  return useMutation<ProjectDTO, Error, UpdateProjectInput>({
+  return useMutation({
     mutationFn: updateProject,
-    onSuccess: (updated) => {
-      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(), (prev) =>
-        prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev
+    onSuccess: (updated, { boardId }) => {
+      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(boardId), (prev) =>
+        prev?.map((p) => (p.id === updated.id ? { ...p, name: updated.name } : p))
       );
     },
   });
@@ -36,15 +28,14 @@ export function useUpdateProjectMutation() {
 
 export function useDeleteProjectMutation() {
   const qc = useQueryClient();
-
-  return useMutation<void, Error, DeleteProjectInput>({
+  return useMutation({
     mutationFn: deleteProject,
-    onSuccess: (_data, variables) => {
-      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(), (prev) =>
-        prev ? prev.filter((p) => p.id !== variables.projectId) : prev
+    onSuccess: (_data, { projectId, boardId }) => {
+      qc.setQueryData<ProjectDTO[]>(workQueryKeys.projects(boardId), (prev) =>
+        prev ? prev.filter((p) => p.id !== projectId) : prev
       );
-      qc.removeQueries({ queryKey: workQueryKeys.tasks(variables.projectId) });
-      qc.removeQueries({ queryKey: workQueryKeys.todos(variables.projectId) });
+      // 프로젝트 삭제 시 속한 아이템도 CASCADE → 보드 아이템 캐시 무효화
+      qc.invalidateQueries({ queryKey: workQueryKeys.boardItems(boardId) });
     },
   });
 }
