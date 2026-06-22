@@ -162,6 +162,9 @@ const boardItemRoutes: FastifyPluginAsync = async (fastify) => {
         .query<BoardItemRow[]>(`SELECT ${SELECT_COLS} FROM board_items WHERE id = ?`, [
           result.insertId,
         ]);
+      if (!rows[0]) {
+        return reply.status(500).send({ resultMessage: '생성 후 조회에 실패했습니다.' });
+      }
       return reply.status(201).send(toBoardItemDTO(rows[0]));
     } catch (err) {
       request.log.error(err);
@@ -203,6 +206,9 @@ const boardItemRoutes: FastifyPluginAsync = async (fastify) => {
         const [rows] = await sql_con
           .promise()
           .query<BoardItemRow[]>(`SELECT ${SELECT_COLS} FROM board_items WHERE id = ?`, [id]);
+        if (!rows[0]) {
+          return reply.status(404).send({ resultMessage: '해당 아이템을 찾을 수 없습니다.' });
+        }
         return toBoardItemDTO(rows[0]);
       } catch (err) {
         request.log.error(err);

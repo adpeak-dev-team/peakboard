@@ -46,6 +46,29 @@ import { todayStr } from '@/lib/date';
 const config = BOARD_CONFIG.dev;
 const STATUSES = config.groups; // 해야할일 / 진행중 / 완료
 
+// 기존(dev) 칸반 UI 색상: 컬럼 배경 + 카드 좌측 보더
+const COLUMN_STYLE: Record<string, { bg: string; cardBorder: string }> = {
+  해야할일: { bg: 'bg-gray-100', cardBorder: '' },
+  진행중: { bg: 'bg-blue-50', cardBorder: 'border-l-4 border-blue-500' },
+  완료: { bg: 'bg-green-50', cardBorder: 'border-l-4 border-green-500' },
+};
+
+// 컬럼 내 작업을 담당자별로 묶기 (미지정은 맨 뒤)
+function groupByAssignee(items: BoardItemDTO[]): [string, BoardItemDTO[]][] {
+  const m = new Map<string, BoardItemDTO[]>();
+  for (const it of items) {
+    const k = it.assignee.trim() || '미지정';
+    const arr = m.get(k);
+    if (arr) arr.push(it);
+    else m.set(k, [it]);
+  }
+  return [...m.entries()].sort((a, b) => {
+    if (a[0] === '미지정') return 1;
+    if (b[0] === '미지정') return -1;
+    return a[0].localeCompare(b[0], 'ko');
+  });
+}
+
 interface DevBoardViewProps {
   board: BoardDTO;
   /** 헤더 토글에서 주입: 'calendar'(달력형) | 'manage'(프로젝트 관리) */
@@ -462,7 +485,8 @@ function StatusPanel({
       setOrder(projectItems);
       return;
     }
-    const ids = order.filter((it) => it.groupKey === dest).map((it) => it.id);
+    // SortableContext 와 동일하게 담당자 그룹 순서로 id 배열 구성 (인덱스 정합성)
+    const ids = groupByAssignee(byStatus(dest)).flatMap(([, list]) => list.map((it) => it.id));
     const activeIdx = ids.indexOf(active.id as string);
     const overId = over.id as string;
     const overIdx = overId.startsWith('status:') ? ids.length - 1 : ids.indexOf(overId);
@@ -498,25 +522,43 @@ function StatusPanel({
         setOrder(projectItems);
       }}
     >
-      <div className="flex flex-col md:flex-row gap-3 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
         {STATUSES.map((status) => {
           const statusItems = byStatus(status);
-          const color = config.groupColors[status];
+          const style = COLUMN_STYLE[status] ?? { bg: 'bg-gray-100', cardBorder: '' };
           return (
             <KanbanColumn
               key={status}
               status={status}
-              chip={color?.chip ?? 'bg-gray-100 text-gray-600 border-gray-200'}
+              bg={style.bg}
               count={statusItems.length}
               onAdd={() => onAddItem(status)}
             >
               <SortableContext
-                items={statusItems.map((it) => it.id)}
+                items={groupByAssignee(statusItems).flatMap(([, list]) =>
+                  list.map((it) => it.id)
+                )}
                 strategy={verticalListSortingStrategy}
               >
-                {statusItems.map((it) => (
-                  <TaskCard key={it.id} item={it} onOpen={() => onOpenItem(it.id)} />
+                {groupByAssignee(statusItems).map(([assignee, list]) => (
+                  <div key={assignee} className="space-y-2">
+                    <div className="flex items-center gap-1.5 px-1">
+                      <span className="text-xs font-semibold text-gray-500">{assignee}</span>
+                      <span className="text-[10px] text-gray-400">{list.length}</span>
+                    </div>
+                    {list.map((it) => (
+                      <TaskCard
+                        key={it.id}
+                        item={it}
+                        cardBorder={style.cardBorder}
+                        onOpen={() => onOpenItem(it.id)}
+                      />
+                    ))}
+                  </div>
                 ))}
+                {statusItems.length === 0 && (
+                  <p className="text-xs text-gray-400 px-1 py-1">작업 없음</p>
+                )}
               </SortableContext>
             </KanbanColumn>
           );
@@ -536,35 +578,41 @@ function StatusPanel({
 
 function KanbanColumn({
   status,
-  chip,
+  bg,
   count,
   onAdd,
   children,
 }: {
   status: string;
-  chip: string;
+  bg: string;
   count: number;
   onAdd: () => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `status:${status}` });
   return (
-    <div className="flex-1 w-full min-h-0 flex flex-col rounded-lg border border-gray-200 bg-gray-50">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 shrink-0">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${chip}`}>
+    <div
+      className={`w-full md:flex-1 min-h-0 flex flex-col rounded-xl p-4 transition-colors ${bg} ${
+        isOver ? 'ring-2 ring-indigo-300' : ''
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3 px-1 shrink-0">
+        <h2 className="font-semibold text-gray-700 flex items-center gap-2">
           {status}
-        </span>
-        <span className="text-xs text-gray-400">{count}</span>
+          <span className="bg-white text-gray-500 text-xs px-2 py-0.5 rounded-full shadow-sm">
+            {count}
+          </span>
+        </h2>
         <button
           onClick={onAdd}
-          className="ml-auto flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
         >
           <Plus className="w-3.5 h-3.5" />추가
         </button>
       </div>
       <div
         ref={setNodeRef}
-        className={`p-2 flex flex-col gap-1.5 flex-1 min-h-32 md:min-h-0 overflow-y-auto ${isOver ? 'bg-indigo-50/40' : ''}`}
+        className="flex-1 overflow-y-auto space-y-3 pb-1 min-h-8"
       >
         {children}
       </div>
@@ -572,7 +620,15 @@ function KanbanColumn({
   );
 }
 
-function TaskCard({ item, onOpen }: { item: BoardItemDTO; onOpen: () => void }) {
+function TaskCard({
+  item,
+  cardBorder,
+  onOpen,
+}: {
+  item: BoardItemDTO;
+  cardBorder: string;
+  onOpen: () => void;
+}) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({
     id: item.id,
   });
@@ -585,20 +641,24 @@ function TaskCard({ item, onOpen }: { item: BoardItemDTO; onOpen: () => void }) 
     <div
       ref={setNodeRef}
       style={style}
-      className="group flex items-center gap-1.5 bg-white rounded-md border border-gray-200 px-2 py-1.5 hover:border-indigo-300"
+      className={`group relative bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${cardBorder}`}
     >
-      <button
-        className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none shrink-0"
-        aria-label="이동"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="w-4 h-4" />
-      </button>
-      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-        <p className="text-sm text-gray-800 truncate">{item.title || '제목 없음'}</p>
-        {item.eventDate && <p className="text-xs text-gray-400">{item.eventDate}</p>}
-      </button>
+      <div className="flex items-start gap-2">
+        <button
+          className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none shrink-0 mt-0.5"
+          aria-label="이동"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <button onClick={onOpen} className="flex-1 min-w-0 text-left">
+          <p className="text-sm font-medium text-gray-700 wrap-break-word">
+            {item.title || '제목 없음'}
+          </p>
+          {item.eventDate && <p className="mt-1 text-xs text-gray-400">{item.eventDate}</p>}
+        </button>
+      </div>
     </div>
   );
 }

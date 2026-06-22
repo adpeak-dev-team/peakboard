@@ -177,7 +177,7 @@ export default function AppShell({
           </button>
           {header}
         </header>
-        <div className="flex-1 overflow-auto p-4 lg:p-6">{children}</div>
+        <div className="flex-1 overflow-auto p-6 lg:p-10">{children}</div>
       </main>
     </div>
   );

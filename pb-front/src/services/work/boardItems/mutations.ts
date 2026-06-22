@@ -49,8 +49,9 @@ export function useReorderBoardItemsMutation() {
   return useMutation({
     mutationFn: reorderBoardItems,
     // 드래그 결과 즉시 반영: 대상 그룹 아이템의 group_key/position 갱신
-    onMutate: ({ boardId, groupKey, orderedIds }) => {
+    onMutate: async ({ boardId, groupKey, orderedIds }) => {
       const key = workQueryKeys.boardItems(boardId);
+      await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<BoardItemDTO[]>(key);
       const orderIndex = new Map(orderedIds.map((id, idx) => [id, idx]));
       qc.setQueryData<BoardItemDTO[]>(key, (list) =>
@@ -64,6 +65,10 @@ export function useReorderBoardItemsMutation() {
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(ctx.key, ctx.prev);
+    },
+    // 서버 상태와 재동기화 (낙관적 순서가 in-flight refetch 등에 덮이지 않도록)
+    onSettled: (_data, _err, { boardId }) => {
+      qc.invalidateQueries({ queryKey: workQueryKeys.boardItems(boardId) });
     },
   });
 }

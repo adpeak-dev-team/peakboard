@@ -85,6 +85,9 @@ const columnOptionRoutes: FastifyPluginAsync = async (fastify) => {
           `SELECT ${SELECT} FROM column_options WHERE board_id = ? AND column_key = ? AND value = ?`,
           [boardId, columnKey, value]
         );
+      if (!rows[0]) {
+        return reply.status(500).send({ resultMessage: '저장 후 조회에 실패했습니다.' });
+      }
       return toDTO(rows[0]);
     } catch (err) {
       request.log.error(err);

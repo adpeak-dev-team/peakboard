@@ -78,6 +78,9 @@ const leaveRoutes: FastifyPluginAsync = async (fastify) => {
     const endDate =
       typeof b.endDate === 'string' && DATE_RE.test(b.endDate) ? b.endDate : startDate;
     if (!startDate) return reply.status(400).send({ resultMessage: '시작일이 필요합니다.' });
+    if (endDate < startDate) {
+      return reply.status(400).send({ resultMessage: '종료일이 시작일보다 빠를 수 없습니다.' });
+    }
     const days = Number.isFinite(Number(b.days)) && Number(b.days) > 0 ? Math.floor(Number(b.days)) : 1;
     const reason = typeof b.reason === 'string' ? b.reason.slice(0, 255) : '';
     try {
@@ -90,6 +93,9 @@ const leaveRoutes: FastifyPluginAsync = async (fastify) => {
       const [rows] = await sql_con
         .promise()
         .query<LeaveRow[]>(`${SELECT} WHERE lr.id = ?`, [result.insertId]);
+      if (!rows[0]) {
+        return reply.status(500).send({ resultMessage: '신청 후 조회에 실패했습니다.' });
+      }
       return reply.status(201).send(toDTO(rows[0]));
     } catch (err) {
       request.log.error(err);
@@ -116,6 +122,9 @@ const leaveRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(404).send({ resultMessage: '해당 신청을 찾을 수 없습니다.' });
         }
         const [rows] = await sql_con.promise().query<LeaveRow[]>(`${SELECT} WHERE lr.id = ?`, [id]);
+        if (!rows[0]) {
+          return reply.status(404).send({ resultMessage: '해당 신청을 찾을 수 없습니다.' });
+        }
         return toDTO(rows[0]);
       } catch (err) {
         request.log.error(err);

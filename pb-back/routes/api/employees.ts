@@ -81,6 +81,9 @@ const employeeRoutes: FastifyPluginAsync = async (fastify) => {
         .query<EmployeeRow[]>(`SELECT ${SELECT_COLS} FROM employees WHERE id = ?`, [
           result.insertId,
         ]);
+      if (!rows[0]) {
+        return reply.status(500).send({ resultMessage: '생성 후 조회에 실패했습니다.' });
+      }
       return reply.status(201).send(toEmployeeDTO(rows[0]));
     } catch (err) {
       request.log.error(err);
@@ -128,6 +131,9 @@ const employeeRoutes: FastifyPluginAsync = async (fastify) => {
         const [rows] = await sql_con
           .promise()
           .query<EmployeeRow[]>(`SELECT ${SELECT_COLS} FROM employees WHERE id = ?`, [id]);
+        if (!rows[0]) {
+          return reply.status(404).send({ resultMessage: '해당 직원을 찾을 수 없습니다.' });
+        }
         return toEmployeeDTO(rows[0]);
       } catch (err) {
         request.log.error(err);

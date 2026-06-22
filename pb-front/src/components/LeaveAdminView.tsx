@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Check, X, Trash2, Users, CalendarCheck } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
-import { computeAnnualLeave } from '@/lib/leave';
+import { computeAnnualLeave, leavePeriod, usedLeaveDays } from '@/lib/leave';
+import { todayStr } from '@/lib/date';
 import { useEmployeesQuery } from '@/services/work/employees/queries';
 import { useUpdateEmployeeMutation } from '@/services/work/employees/mutations';
 import { useLeaveRequestsQuery } from '@/services/work/leave/queries';
@@ -26,7 +27,7 @@ const STATUS_CHIP: Record<LeaveStatus, string> = {
 
 export default function LeaveAdminView() {
   const employeesQuery = useEmployeesQuery();
-  const employees = employeesQuery.data ?? [];
+  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const updateEmployee = useUpdateEmployeeMutation();
   const leaveQuery = useLeaveRequestsQuery();
   const requests = useMemo(() => leaveQuery.data ?? [], [leaveQuery.data]);
@@ -35,14 +36,17 @@ export default function LeaveAdminView() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [tab, setTab] = useState<'status' | 'requests'>('status');
 
+  // 직원별 "현재 연차 기간(입사일 기준)" 내 사용일수만 집계
+  const today = todayStr();
   const usedByEmployee = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of requests) {
-      if (r.status !== 'approved') continue;
-      map.set(r.employeeId, (map.get(r.employeeId) ?? 0) + r.days);
+    for (const emp of employees) {
+      const period = leavePeriod(emp.hireDate, today);
+      const empReqs = requests.filter((r) => r.employeeId === emp.id);
+      map.set(emp.id, usedLeaveDays(empReqs, period));
     }
     return map;
-  }, [requests]);
+  }, [employees, requests, today]);
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
 

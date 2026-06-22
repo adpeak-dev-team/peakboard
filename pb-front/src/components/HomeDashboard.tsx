@@ -2,18 +2,33 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { Plus, ChevronLeft, ChevronRight, Trash2, CalendarCheck, Check } from 'lucide-react';
+import {
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  CalendarCheck,
+  Check,
+  ClipboardList,
+  ExternalLink,
+} from 'lucide-react';
 import Modal from './Modal';
 import { todayStr } from '@/lib/date';
-import { countLeaveDays, leavePeriod } from '@/lib/leave';
+import { countLeaveDays, leavePeriod, usedLeaveDays } from '@/lib/leave';
 import { getHoliday } from '@/lib/holidays';
 import { useScheduleEvents, isLeaveEventId } from '@/lib/calendarEvents';
 import { useCustomHolidayMap } from '@/lib/useHolidays';
-import { workQueryKeys, type BoardItemDTO, type EventDTO, type LeaveStatus } from '@/services/work/type';
+import {
+  workQueryKeys,
+  type BoardItemDTO,
+  type EmployeeDTO,
+  type EventDTO,
+  type LeaveRequestDTO,
+  type LeaveStatus,
+} from '@/services/work/type';
 import { fetchBoardItems } from '@/services/work/boardItems/api';
 import { useBoardsQuery } from '@/services/work/boards/queries';
 import { useUpdateBoardItemMutation } from '@/services/work/boardItems/mutations';
-import { useEmployeesQuery } from '@/services/work/employees/queries';
 import { useLeaveRequestsQuery } from '@/services/work/leave/queries';
 import { useCreateLeaveMutation, useDeleteLeaveMutation } from '@/services/work/leave/mutations';
 import { useEventsQuery } from '@/services/work/events/queries';
@@ -23,8 +38,15 @@ import {
   useDeleteEventMutation,
 } from '@/services/work/events/mutations';
 
-const ME_KEY = 'peakboard:meId';
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+// 패밀리사이트 (임시 링크 — 추후 교체)
+const FAMILY_SITES: { name: string; url: string }[] = [
+  { name: '탑분양', url: 'https://adpeak.kr' },
+  { name: '위드분양', url: 'https://withby.kr/' },
+  { name: '리치분양', url: 'https://richby.co.kr' },
+  { name: '번개분양', url: 'https://lightby.co.kr' },
+];
 
 const STATUS_LABEL: Record<LeaveStatus, string> = { pending: '대기', approved: '승인', rejected: '반려' };
 const STATUS_CHIP: Record<LeaveStatus, string> = {
@@ -37,9 +59,7 @@ function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export default function HomeDashboard() {
-  const employeesQuery = useEmployeesQuery();
-  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
+export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
   const leaveQuery = useLeaveRequestsQuery();
   const leaveRequests = leaveQuery.data ?? [];
   const boardsQuery = useBoardsQuery();
@@ -64,16 +84,8 @@ export default function HomeDashboard() {
   const holidaySet = useMemo(() => new Set(customHolidays.keys()), [customHolidays]);
   const isHoliday = (d: string) => !!getHoliday(d) || holidaySet.has(d);
 
-  const [meId, setMeId] = useState<string>(() =>
-    typeof window === 'undefined' ? '' : sessionStorage.getItem(ME_KEY) ?? ''
-  );
-  const me = employees.find((e) => e.id === meId) ?? employees[0] ?? null;
-  const selectMe = (id: string) => {
-    setMeId(id);
-    if (typeof window !== 'undefined') sessionStorage.setItem(ME_KEY, id);
-  };
-
   const [applyOpen, setApplyOpen] = useState(false);
+  const [leaveListOpen, setLeaveListOpen] = useState(false);
   const [eventTarget, setEventTarget] = useState<{ mode: 'add'; date: string } | { mode: 'edit'; event: EventDTO } | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -94,11 +106,10 @@ export default function HomeDashboard() {
   const activeDate = selectedDate ?? today;
 
   const myRequests = me ? leaveRequests.filter((r) => r.employeeId === me.id) : [];
-  const usedDays = myRequests.filter((r) => r.status === 'approved').reduce((s, r) => s + r.days, 0);
+  const period = leavePeriod(me?.hireDate, today);
+  const usedDays = usedLeaveDays(myRequests, period);
   const total = me?.leaveTotal ?? 0;
   const usagePct = total > 0 ? Math.round((usedDays / total) * 100) : 0;
-  const remaining = total - usedDays;
-  const period = leavePeriod(me?.hireDate, today);
 
   const myTodos = useMemo(
     () => (me ? allItems.filter((it) => it.assignee.trim() === me.name && it.eventDate) : []),
@@ -130,36 +141,38 @@ export default function HomeDashboard() {
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-0">
-      <div className="flex items-center justify-end gap-2 shrink-0">
-        <span className="text-xs text-gray-500">계정</span>
-        <select
-          value={me?.id ?? ''}
-          onChange={(e) => selectMe(e.target.value)}
-          className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md cursor-pointer bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
-        >
-          {employees.length === 0 && <option value="">직원 없음</option>}
-          {employees.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.name} {e.department && `(${e.department})`}
-            </option>
-          ))}
-        </select>
-      </div>
-
+    <div className="flex flex-col gap-4 h-full min-h-0 max-w-5xl mx-auto">
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* 연차 */}
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col min-h-0">
-          <h3 className="text-base font-bold text-gray-800 mb-4 shrink-0">연차 현황</h3>
-          <div className="shrink-0">
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <Stat label="부여" value={`${total}`} />
-              <Stat label="사용" value={`${usedDays}`} tone="indigo" />
-              <Stat label="잔여" value={`${remaining}`} tone="green" />
+        {/* 왼쪽: 프로필 + 연차 현황 + 패밀리사이트 */}
+        <div className="flex flex-col gap-4 min-h-0">
+          <ProfileCard me={me} />
+
+          {/* 연차 현황 */}
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 shrink-0">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-base font-bold text-gray-800">연차 현황</h3>
+              <button
+                onClick={() => setLeaveListOpen(true)}
+                className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-indigo-600"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                신청 내역
+                {myRequests.length > 0 && (
+                  <span className="ml-0.5 px-1.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold">
+                    {myRequests.length}
+                  </span>
+                )}
+              </button>
             </div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-gray-400">사용률</span>
-              <span className="text-sm font-bold text-gray-700">{usagePct}%</span>
+            <div className="flex items-end justify-between mb-1.5">
+              <span className="text-lg font-bold">
+                <span className="text-indigo-600">{usedDays}</span>
+                <span className="text-gray-400 text-sm font-semibold">/{total}일</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-gray-400">사용률</span>
+                <span className="text-sm font-bold text-gray-700">{usagePct}%</span>
+              </div>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
               <div
@@ -173,42 +186,13 @@ export default function HomeDashboard() {
             <button
               onClick={() => setApplyOpen(true)}
               disabled={!me}
-              className="mt-3 w-full py-2.5 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              className="mt-8 w-full py-2.5 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
               연차 신청
             </button>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col min-h-0">
-            <p className="text-xs font-semibold text-gray-500 mb-2 shrink-0">내 연차 신청 내역</p>
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5 pr-1">
-              {myRequests.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">신청 내역이 없습니다.</p>
-              ) : (
-                myRequests.map((r) => (
-                  <div key={r.id} className="flex items-center gap-2 rounded-md border border-gray-100 px-2.5 py-2">
-                    <span className={`px-1.5 py-0.5 rounded-full border text-[10px] font-semibold shrink-0 ${STATUS_CHIP[r.status]}`}>
-                      {STATUS_LABEL[r.status]}
-                    </span>
-                    <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">
-                      {r.startDate}
-                      {r.endDate !== r.startDate ? ` ~ ${r.endDate}` : ''} · {r.days}일
-                      {r.reason ? ` · ${r.reason}` : ''}
-                    </span>
-                    {r.status === 'pending' && (
-                      <button
-                        onClick={() => deleteLeave.mutate(r.id)}
-                        className="text-gray-300 hover:text-red-500 shrink-0"
-                        aria-label="취소"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <FamilySites />
         </div>
 
         {/* 일정 */}
@@ -221,7 +205,7 @@ export default function HomeDashboard() {
             <div className="flex items-center justify-between mb-2 shrink-0">
               <p className="text-xs font-semibold text-gray-500 flex items-center gap-1">
                 <CalendarCheck className="w-3.5 h-3.5" />
-                {activeDate === today ? '오늘' : activeDate} 일정
+                {activeDate === today ? '오늘' : activeDate} 할일
               </p>
               <button
                 onClick={() => setEventTarget({ mode: 'add', date: activeDate })}
@@ -323,20 +307,96 @@ export default function HomeDashboard() {
           onDelete={(id) => deleteEvent.mutate({ id }, { onError: () => alert('일정 삭제 실패') })}
         />
       )}
+
+      {leaveListOpen && (
+        <LeaveListModal
+          requests={myRequests}
+          onDelete={(id) => deleteLeave.mutate(id)}
+          onClose={() => setLeaveListOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function Stat({ label, value, tone = 'gray' }: { label: string; value: string; tone?: 'gray' | 'indigo' | 'green' }) {
-  const cls = tone === 'indigo' ? 'text-indigo-600' : tone === 'green' ? 'text-green-600' : 'text-gray-800';
+function ProfileCard({ me }: { me: EmployeeDTO | null }) {
+  const initial = me?.name?.trim()?.[0] ?? '?';
   return (
-    <div className="rounded-lg bg-gray-50 p-3 text-center">
-      <p className="text-[11px] text-gray-400 mb-0.5">{label}</p>
-      <p className={`text-xl font-bold ${cls}`}>
-        {value}
-        <span className="text-xs font-medium text-gray-400">일</span>
-      </p>
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex items-center gap-4 shrink-0">
+      <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-lg font-bold shrink-0">
+        {initial}
+      </div>
+      <div className="min-w-0">
+        <p className="text-base font-bold text-gray-800 truncate">{me?.name || '직원 미선택'}</p>
+        <p className="text-sm text-gray-500 truncate">
+          {[me?.department, me?.position].filter(Boolean).join(' · ') || '-'}
+        </p>
+      </div>
     </div>
+  );
+}
+
+function FamilySites() {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 shrink-0">
+      <h3 className="text-base font-bold text-gray-800 mb-3">패밀리사이트</h3>
+      <div className="grid grid-cols-2 gap-2">
+        {FAMILY_SITES.map((s) => (
+          <a
+            key={s.name}
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2.5 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors"
+          >
+            <span className="text-sm text-gray-700 truncate">{s.name}</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-500 shrink-0" />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeaveListModal({
+  requests,
+  onDelete,
+  onClose,
+}: {
+  requests: LeaveRequestDTO[];
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open title="내 연차 신청 내역" onClose={onClose} width="max-w-md">
+      <div className="flex flex-col gap-1.5 min-h-64 max-h-[60vh] overflow-y-auto pr-1">
+        {requests.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">신청 내역이 없습니다.</p>
+        ) : (
+          requests.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 rounded-md border border-gray-100 px-2.5 py-2">
+              <span className={`px-1.5 py-0.5 rounded-full border text-[10px] font-semibold shrink-0 ${STATUS_CHIP[r.status]}`}>
+                {STATUS_LABEL[r.status]}
+              </span>
+              <span className="flex-1 min-w-0 text-sm text-gray-700 truncate">
+                {r.startDate}
+                {r.endDate !== r.startDate ? ` ~ ${r.endDate}` : ''} · {r.days}일
+                {r.reason ? ` · ${r.reason}` : ''}
+              </span>
+              {r.status === 'pending' && (
+                <button
+                  onClick={() => onDelete(r.id)}
+                  className="text-gray-300 hover:text-red-500 shrink-0"
+                  aria-label="취소"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </Modal>
   );
 }
 
