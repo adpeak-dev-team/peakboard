@@ -11,6 +11,8 @@ import {
   Check,
   ClipboardList,
   ExternalLink,
+  Stamp,
+  X,
 } from 'lucide-react';
 import Modal from './Modal';
 import { todayStr } from '@/lib/date';
@@ -30,7 +32,11 @@ import { fetchBoardItems } from '@/services/work/boardItems/api';
 import { useBoardsQuery } from '@/services/work/boards/queries';
 import { useUpdateBoardItemMutation } from '@/services/work/boardItems/mutations';
 import { useLeaveRequestsQuery } from '@/services/work/leave/queries';
-import { useCreateLeaveMutation, useDeleteLeaveMutation } from '@/services/work/leave/mutations';
+import {
+  useCreateLeaveMutation,
+  useDeleteLeaveMutation,
+  useUpdateLeaveStatusMutation,
+} from '@/services/work/leave/mutations';
 import { useEventsQuery } from '@/services/work/events/queries';
 import {
   useCreateEventMutation,
@@ -59,7 +65,26 @@ function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
+// 입사일 ~ 오늘 근속 기간 (YYYY-MM-DD 문자열 기준)
+function tenureStr(hireDate: string | null | undefined, today: string): string {
+  if (!hireDate) return '-';
+  const [hy, hm, hd] = hireDate.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  let months = (ty - hy) * 12 + (tm - hm);
+  if (td < hd) months -= 1;
+  if (months < 0) return '-';
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return y > 0 ? `${y}년 ${m}개월` : `${m}개월`;
+}
+
+export default function HomeDashboard({
+  me,
+  isAdmin,
+}: {
+  me: EmployeeDTO | null;
+  isAdmin: boolean;
+}) {
   const leaveQuery = useLeaveRequestsQuery();
   const leaveRequests = leaveQuery.data ?? [];
   const boardsQuery = useBoardsQuery();
@@ -80,6 +105,7 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
   const updateItem = useUpdateBoardItemMutation();
   const createLeave = useCreateLeaveMutation();
   const deleteLeave = useDeleteLeaveMutation();
+  const updateLeaveStatus = useUpdateLeaveStatusMutation();
 
   const holidaySet = useMemo(() => new Set(customHolidays.keys()), [customHolidays]);
   const isHoliday = (d: string) => !!getHoliday(d) || holidaySet.has(d);
@@ -111,6 +137,12 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
   const total = me?.leaveTotal ?? 0;
   const usagePct = total > 0 ? Math.round((usedDays / total) * 100) : 0;
 
+  // 결재 대기: 승인 대기(pending) 연차 신청
+  const pendingApprovals = useMemo(
+    () => leaveRequests.filter((r) => r.status === 'pending'),
+    [leaveRequests]
+  );
+
   const myTodos = useMemo(
     () => (me ? allItems.filter((it) => it.assignee.trim() === me.name && it.eventDate) : []),
     [allItems, me]
@@ -141,14 +173,13 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-0 max-w-5xl mx-auto">
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* 왼쪽: 프로필 + 연차 현황 + 패밀리사이트 */}
-        <div className="flex flex-col gap-4 min-h-0">
-          <ProfileCard me={me} />
+    <div className="h-full min-h-0 max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 overflow-y-auto lg:overflow-hidden">
+      {/* 중: 프로필 + 연차 현황 + 패밀리사이트 */}
+      <div className="lg:flex-1 lg:min-w-0 lg:h-full lg:min-h-0 flex flex-col gap-4">
+          <ProfileCard me={me} today={today} />
 
           {/* 연차 현황 */}
-          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 shrink-0">
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 lg:flex-1 lg:min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-base font-bold text-gray-800">연차 현황</h3>
               <button
@@ -186,22 +217,27 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
             <button
               onClick={() => setApplyOpen(true)}
               disabled={!me}
-              className="mt-8 w-full py-2.5 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              className="mt-auto w-full py-2.5 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
               연차 신청
             </button>
           </div>
 
           <FamilySites />
-        </div>
+      </div>
+      
+      
+      
 
-        {/* 일정 */}
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col min-h-0">
+      
+
+      {/* 우: 일정 (세로로 길게) */}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col lg:flex-1 lg:min-w-0 lg:h-full lg:min-h-0">
           <h3 className="text-base font-bold text-gray-800 mb-4 shrink-0">일정</h3>
           <div className="shrink-0">
             <MiniCalendar now={now} selected={activeDate} onSelect={setSelectedDate} marked={markedDates} isHoliday={isHoliday} />
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col min-h-0">
+          <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col flex-1 min-h-0">
             <div className="flex items-center justify-between mb-2 shrink-0">
               <p className="text-xs font-semibold text-gray-500 flex items-center gap-1">
                 <CalendarCheck className="w-3.5 h-3.5" />
@@ -279,7 +315,16 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
             </div>
           </div>
         </div>
-      </div>
+
+        {/* 좌: 결재 대기 (관리자 전용, 세로로 길게) */}
+      {isAdmin && (
+        <PendingApprovalsCard
+          className="lg:flex-[0.8] lg:min-w-0 lg:h-full lg:min-h-0"
+          requests={pendingApprovals}
+          onApprove={(id) => updateLeaveStatus.mutate({ id, status: 'approved' })}
+          onReject={(id) => updateLeaveStatus.mutate({ id, status: 'rejected' })}
+        />
+      )}
 
       {applyOpen && me && (
         <LeaveApplyModal
@@ -319,18 +364,36 @@ export default function HomeDashboard({ me }: { me: EmployeeDTO | null }) {
   );
 }
 
-function ProfileCard({ me }: { me: EmployeeDTO | null }) {
+function ProfileCard({ me, today }: { me: EmployeeDTO | null; today: string }) {
   const initial = me?.name?.trim()?.[0] ?? '?';
+  const tenure = tenureStr(me?.hireDate, today);
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex items-center gap-4 shrink-0">
-      <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-lg font-bold shrink-0">
-        {initial}
-      </div>
-      <div className="min-w-0">
-        <p className="text-base font-bold text-gray-800 truncate">{me?.name || '직원 미선택'}</p>
-        <p className="text-sm text-gray-500 truncate">
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex flex-col lg:flex-[1.6] lg:min-h-0">
+      {/* 그라데이션 헤더 */}
+      <div className="h-24 bg-linear-to-r from-indigo-500 via-violet-500 to-blue-500 shrink-0" />
+      <div className="px-5 pb-5 -mt-9 flex-1 flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-full overflow-hidden ring-4 ring-white bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-2xl font-bold shadow-md shrink-0">
+          {me?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={me.avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            initial
+          )}
+        </div>
+        <p className="mt-3 text-lg font-bold text-gray-800 truncate w-full">{me?.name || '직원 미선택'}</p>
+        <p className="text-sm text-gray-500 truncate w-full">
           {[me?.department, me?.position].filter(Boolean).join(' · ') || '-'}
         </p>
+        <div className="mt-auto pt-4 w-full grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-gray-50 py-2 px-1">
+            <p className="text-[11px] text-gray-400">입사일</p>
+            <p className="text-sm font-semibold text-gray-700 truncate">{me?.hireDate || '-'}</p>
+          </div>
+          <div className="rounded-lg bg-gray-50 py-2 px-1">
+            <p className="text-[11px] text-gray-400">근속</p>
+            <p className="text-sm font-semibold text-gray-700 truncate">{tenure}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -338,22 +401,88 @@ function ProfileCard({ me }: { me: EmployeeDTO | null }) {
 
 function FamilySites() {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 shrink-0">
-      <h3 className="text-base font-bold text-gray-800 mb-3">패밀리사이트</h3>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 lg:flex-[0.6] lg:min-h-0 flex flex-col">
+      <h3 className="text-base font-bold text-gray-800 mb-3 shrink-0">패밀리사이트</h3>
+      <div className="grid grid-cols-2 grid-rows-2 gap-2 flex-1 min-h-0">
         {FAMILY_SITES.map((s) => (
           <a
             key={s.name}
             href={s.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2.5 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors"
+            className="group flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors"
           >
             <span className="text-sm text-gray-700 truncate">{s.name}</span>
             <ExternalLink className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-500 shrink-0" />
           </a>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PendingApprovalsCard({
+  requests,
+  onApprove,
+  onReject,
+  className = '',
+}: {
+  requests: LeaveRequestDTO[];
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+          <Stamp className="w-4 h-4 text-gray-400" />
+          결재 대기
+        </h3>
+        {requests.length > 0 && (
+          <span className="px-1.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold">
+            {requests.length}
+          </span>
+        )}
+      </div>
+      {requests.length === 0 ? (
+        <p className="text-sm text-gray-400 py-2 text-center">대기 중인 결재가 없습니다.</p>
+      ) : (
+        <div className="flex flex-col gap-2 overflow-y-auto pr-1">
+          {requests.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-bold shrink-0">
+                {(r.employeeName || '?').charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {r.employeeName || '-'}
+                  <span className="ml-1.5 text-xs font-bold text-indigo-600">{r.days}일</span>
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {r.startDate}
+                  {r.endDate !== r.startDate ? ` ~ ${r.endDate}` : ''}
+                  {r.reason ? ` · ${r.reason}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => onApprove(r.id)}
+                className="p-1.5 rounded-md text-green-700 bg-green-50 hover:bg-green-100 shrink-0"
+                aria-label="승인"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onReject(r.id)}
+                className="p-1.5 rounded-md text-gray-500 bg-gray-100 hover:bg-gray-200 shrink-0"
+                aria-label="반려"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

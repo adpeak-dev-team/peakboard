@@ -1,12 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import BoardCalendarView, { type CalendarEvent } from './BoardCalendarView';
 import ItemEditModal from './ItemEditModal';
 import { BOARD_CONFIG, type BoardConfig } from '@/lib/boardConfig';
 import { todayStr } from '@/lib/date';
-import type { BoardDTO, BoardItemDTO, BoardItemPatch } from '@/services/work/type';
+import { useEmployeesQuery } from '@/services/work/employees/queries';
+import type { BoardDTO, BoardItemDTO, BoardItemPatch, EmployeeDTO } from '@/services/work/type';
+
+// 성을 뺀 이름 (한국 성씨는 보통 1글자). "홍길동" → "길동"
+function givenName(full: string): string {
+  const n = full.trim();
+  return n.length > 1 ? n.slice(1) : n;
+}
+
+// 그룹 헤더: 직원이면 프로필사진(있으면)+이름(성 제외), 아니면 원본 라벨
+function PersonLabel({ name, employee }: { name: string; employee?: EmployeeDTO }) {
+  if (!employee) {
+    return <span className="text-xs font-semibold text-gray-700 truncate">{name}</span>;
+  }
+  return (
+    <span className="flex items-center gap-1.5 min-w-0">
+      {employee.avatar && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={employee.avatar} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+      )}
+      <span className="text-xs font-semibold text-gray-700 truncate">{givenName(name)}</span>
+    </span>
+  );
+}
 
 interface TeamCalendarViewProps {
   board: BoardDTO;
@@ -170,6 +193,12 @@ function DateTaskPanel({
 }) {
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   const [addText, setAddText] = useState('');
+  const employeesQuery = useEmployeesQuery();
+  const empByName = useMemo(() => {
+    const m = new Map<string, EmployeeDTO>();
+    for (const e of employeesQuery.data ?? []) m.set(e.name, e);
+    return m;
+  }, [employeesQuery.data]);
   if (!date) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 h-full">
@@ -214,7 +243,7 @@ function DateTaskPanel({
           groups.map(([groupName, list]) => (
             <div key={groupName}>
               <div className="flex items-center gap-1.5 px-1 mb-1">
-                <span className="text-xs font-semibold text-gray-700 truncate">{groupName}</span>
+                <PersonLabel name={groupName} employee={empByName.get(groupName)} />
                 <span className="text-xs text-gray-400">{list.length}</span>
                 {onAddToGroup && (
                   <button

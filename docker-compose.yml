@@ -20,6 +20,7 @@ services:
       DBPWD: "rkwkrh13!#"
       SHEMA: peakboard
       PORT: 3050
+      COOKIE_SECRET: "peakboard-prod-cookie-secret-change-me"
     depends_on:
       mysql:
         condition: service_healthy

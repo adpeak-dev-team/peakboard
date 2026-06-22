@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Table2, CalendarDays, ListTodo } from 'lucide-react';
+import { Table2, CalendarDays, ListTodo, LogOut } from 'lucide-react';
 import { useQueries } from '@tanstack/react-query';
 import AppShell, { type NavKey } from '@/components/AppShell';
 import BoardView from '@/components/BoardView';
@@ -10,20 +10,25 @@ import ScheduleView from '@/components/ScheduleView';
 import MembersView from '@/components/MembersView';
 import HomeDashboard from '@/components/HomeDashboard';
 import LeaveAdminView from '@/components/LeaveAdminView';
+import MyPageModal from '@/components/MyPageModal';
 import { useBoardsQuery } from '@/services/work/boards/queries';
-import { useEmployeesQuery } from '@/services/work/employees/queries';
 import { fetchBoardItems } from '@/services/work/boardItems/api';
 import { workQueryKeys } from '@/services/work/type';
+import { useAuth } from '@/services/auth/AuthProvider';
+import { logout } from '@/services/auth/api';
 
 type ViewMode = 'table' | 'calendar';
 
 const BOARD_SESSION_KEY = 'peakboard:activeBoardId';
-const ME_KEY = 'peakboard:meId';
 
 export default function PeakBoard() {
+  const { user, isLoading: authLoading, isAdmin } = useAuth();
+  const me = user?.employee ?? null;
+
   const [nav, setNav] = useState<NavKey>('home');
   const [view, setView] = useState<ViewMode>('calendar');
   const [devView, setDevView] = useState<'calendar' | 'manage'>('calendar');
+  const [myPageOpen, setMyPageOpen] = useState(false);
   // 세션에 저장된 선택을 초기값으로 복원 (SSR 안전)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : sessionStorage.getItem(BOARD_SESSION_KEY)
@@ -31,18 +36,6 @@ export default function PeakBoard() {
 
   const boardsQuery = useBoardsQuery();
   const boards = useMemo(() => boardsQuery.data ?? [], [boardsQuery.data]);
-
-  // 대시보드 계정 선택 (헤더 우측)
-  const employeesQuery = useEmployeesQuery();
-  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
-  const [meId, setMeId] = useState<string>(() =>
-    typeof window === 'undefined' ? '' : sessionStorage.getItem(ME_KEY) ?? ''
-  );
-  const me = employees.find((e) => e.id === meId) ?? employees[0] ?? null;
-  const selectMe = (id: string) => {
-    setMeId(id);
-    if (typeof window !== 'undefined') sessionStorage.setItem(ME_KEY, id);
-  };
 
   // 모든 보드의 아이템을 미리 조회 (사이드바 카운트 + 일정관리 통합 캘린더용).
   // BoardView 의 useBoardItemsQuery 와 같은 쿼리키라 중복 요청 없이 캐시 공유.
@@ -71,7 +64,31 @@ export default function PeakBoard() {
     if (activeBoardId) sessionStorage.setItem(BOARD_SESSION_KEY, activeBoardId);
   }, [activeBoardId]);
 
+  // 미인증(401/404/네트워크 등 어떤 이유든) → 로그인 페이지로 이동
+  useEffect(() => {
+    if (!authLoading && !user && typeof window !== 'undefined') {
+      window.location.href = '/auth/login';
+    }
+  }, [authLoading, user]);
+
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? null;
+
+  const onLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      window.location.href = '/auth/login';
+    }
+  };
+
+  // 인증 확인 중 또는 미인증(로그인으로 리다이렉트 중) → 빈 화면 대신 로더
+  if (authLoading || !user) {
+    return (
+      <div className="h-screen flex items-center justify-center text-sm text-gray-400">
+        불러오는 중…
+      </div>
+    );
+  }
 
   const header =
     nav === 'projects' ? (
@@ -106,32 +123,51 @@ export default function PeakBoard() {
           </div>
         )}
       </div>
-    ) : nav === 'home' ? (
+    ) : (
       <div className="flex items-center justify-between w-full gap-3">
-        <h1 className="text-base font-bold text-gray-800">대시보드</h1>
+        <h1 className="text-base font-bold text-gray-800">
+          {nav === 'home'
+            ? '대시보드'
+            : nav === 'members'
+            ? '회원관리'
+            : nav === 'leave'
+            ? '연차관리'
+            : '일정관리'}
+        </h1>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-gray-500">계정</span>
-          <select
-            value={me?.id ?? ''}
-            onChange={(e) => selectMe(e.target.value)}
-            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md cursor-pointer bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          <button
+            onClick={() => setMyPageOpen(true)}
+            title="마이페이지"
+            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 transition-colors"
           >
-            {employees.length === 0 && <option value="">직원 없음</option>}
-            {employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name} {e.department && `(${e.department})`}
-              </option>
-            ))}
-          </select>
+            <span className="w-8 h-8 rounded-full overflow-hidden bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
+              {me?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={me.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                (user.name || user.email || '?').charAt(0)
+              )}
+            </span>
+            <span className="text-right leading-tight hidden sm:block">
+              <span className="block text-sm font-semibold text-gray-800">{user.name}</span>
+              <span className="block text-[11px] text-gray-400">
+                {[me?.department, isAdmin ? '관리자' : null].filter(Boolean).join(' · ') || '일반'}
+              </span>
+            </span>
+          </button>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50 hover:text-gray-700"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            로그아웃
+          </button>
         </div>
       </div>
-    ) : (
-      <h1 className="text-base font-bold text-gray-800">
-        {nav === 'members' ? '회원관리' : nav === 'leave' ? '연차관리' : '일정관리'}
-      </h1>
     );
 
   return (
+    <>
     <AppShell
       nav={nav}
       onNavChange={setNav}
@@ -140,9 +176,10 @@ export default function PeakBoard() {
       onSelectBoard={setSelectedBoardId}
       counts={counts}
       header={header}
+      isAdmin={isAdmin}
     >
       {nav === 'home' ? (
-        <HomeDashboard me={me} />
+        <HomeDashboard me={me} isAdmin={isAdmin} />
       ) : nav === 'members' ? (
         <MembersView />
       ) : nav === 'leave' ? (
@@ -161,6 +198,8 @@ export default function PeakBoard() {
         <div className="text-sm text-gray-400 py-10 text-center">보드가 없습니다.</div>
       )}
     </AppShell>
+    {myPageOpen && <MyPageModal user={user} onClose={() => setMyPageOpen(false)} />}
+    </>
   );
 }
 
