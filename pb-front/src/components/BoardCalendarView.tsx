@@ -6,7 +6,14 @@ import ItemEditModal from './ItemEditModal';
 import { getCalendarLabel, type BoardConfig } from '@/lib/boardConfig';
 import { getHoliday } from '@/lib/holidays';
 import { useCustomHolidayMap } from '@/lib/useHolidays';
-import type { BoardItemDTO, BoardItemPatch } from '@/services/work/type';
+import { useEmployeesQuery } from '@/services/work/employees/queries';
+import type { BoardItemDTO, BoardItemPatch, EmployeeDTO } from '@/services/work/type';
+
+// 성을 뺀 이름 (한국 성씨는 보통 1글자). "홍길동" → "길동"
+function givenName(full: string): string {
+  const n = full.trim();
+  return n.length > 1 ? n.slice(1) : n;
+}
 
 /** 달력에 함께 표시할 일정(연차/회사일정 등). 보드 아이템과 별개 레이어. */
 export interface CalendarEvent {
@@ -91,6 +98,12 @@ export default function BoardCalendarView({
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const customHolidays = useCustomHolidayMap();
+  const employeesQuery = useEmployeesQuery();
+  const empByName = useMemo(() => {
+    const m = new Map<string, EmployeeDTO>();
+    for (const e of employeesQuery.data ?? []) m.set(e.name, e);
+    return m;
+  }, [employeesQuery.data]);
 
   const itemsByDate = useMemo(() => {
     const map = new Map<string, BoardItemDTO[]>();
@@ -263,7 +276,28 @@ export default function BoardCalendarView({
                               title={`${key} · ${rep}${more > 0 ? ` 외 ${more}건` : ''}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-                              <span className="font-semibold text-gray-700 shrink-0">{key}</span>
+                              {(() => {
+                                const emp = empByName.get(key);
+                                if (!emp)
+                                  return (
+                                    <span className="font-semibold text-gray-700 shrink-0">{key}</span>
+                                  );
+                                return (
+                                  <span className="flex items-center gap-1 shrink-0">
+                                    {emp.avatar && (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={emp.avatar}
+                                        alt=""
+                                        className="w-4 h-4 rounded-full object-cover"
+                                      />
+                                    )}
+                                    <span className="font-semibold text-gray-700">
+                                      {givenName(key)}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                               <span className="truncate text-gray-500">
                                 {rep}
                                 {more > 0 ? ` 외 ${more}건` : ''}

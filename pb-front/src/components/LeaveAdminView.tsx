@@ -19,11 +19,28 @@ const STATUS_LABEL: Record<LeaveStatus, string> = {
   approved: '승인',
   rejected: '반려',
 };
-const STATUS_CHIP: Record<LeaveStatus, string> = {
-  pending: 'bg-amber-100 text-amber-700 border-amber-200',
-  approved: 'bg-green-100 text-green-700 border-green-200',
-  rejected: 'bg-gray-200 text-gray-500 border-gray-300',
+// 서브탭(세그먼트) 활성 색 + 신청자 아바타 색 + 카운트 뱃지 색
+const STATUS_ACTIVE_TEXT: Record<LeaveStatus, string> = {
+  pending: 'text-amber-700',
+  approved: 'text-green-700',
+  rejected: 'text-gray-600',
 };
+const STATUS_AVATAR: Record<LeaveStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-gray-200 text-gray-500',
+};
+const STATUS_COUNT_BADGE: Record<LeaveStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-gray-300 text-gray-600',
+};
+const STATUS_EMPTY: Record<LeaveStatus, string> = {
+  pending: '대기 중인 신청이 없습니다.',
+  approved: '승인된 신청이 없습니다.',
+  rejected: '반려된 신청이 없습니다.',
+};
+const REQ_TABS: LeaveStatus[] = ['pending', 'approved', 'rejected'];
 
 export default function LeaveAdminView() {
   const employeesQuery = useEmployeesQuery();
@@ -35,6 +52,7 @@ export default function LeaveAdminView() {
   const deleteLeave = useDeleteLeaveMutation();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [tab, setTab] = useState<'status' | 'requests'>('status');
+  const [reqTab, setReqTab] = useState<LeaveStatus>('pending');
 
   // 직원별 "현재 연차 기간(입사일 기준)" 내 사용일수만 집계
   const today = todayStr();
@@ -48,7 +66,20 @@ export default function LeaveAdminView() {
     return map;
   }, [employees, requests, today]);
 
-  const pendingCount = requests.filter((r) => r.status === 'pending').length;
+  // 상태별 카운트 + 현재 서브탭 필터링
+  const reqCounts = useMemo(
+    () => ({
+      pending: requests.filter((r) => r.status === 'pending').length,
+      approved: requests.filter((r) => r.status === 'approved').length,
+      rejected: requests.filter((r) => r.status === 'rejected').length,
+    }),
+    [requests]
+  );
+  const pendingCount = reqCounts.pending;
+  const filteredRequests = useMemo(
+    () => requests.filter((r) => r.status === reqTab),
+    [requests, reqTab]
+  );
 
   return (
     <div className="flex flex-col gap-4 max-w-5xl">
@@ -137,53 +168,92 @@ export default function LeaveAdminView() {
           )}
         </section>
       ) : (
-        <section className="rounded-lg border border-gray-200 bg-white">
-          {requests.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">신청 내역이 없습니다.</p>
-          ) : (
-            requests.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 last:border-b-0"
-              >
-                <span className={`px-1.5 py-0.5 rounded-full border text-[10px] font-semibold shrink-0 ${STATUS_CHIP[r.status]}`}>
-                  {STATUS_LABEL[r.status]}
-                </span>
-                <span className="text-sm font-medium text-gray-800 shrink-0 w-20 truncate">
-                  {r.employeeName || '-'}
-                </span>
-                <span className="flex-1 min-w-0 text-sm text-gray-600 truncate">
-                  {r.startDate}
-                  {r.endDate !== r.startDate ? ` ~ ${r.endDate}` : ''} · {r.days}일
-                  {r.reason ? ` · ${r.reason}` : ''}
-                </span>
-                {r.status !== 'approved' && (
-                  <button
-                    onClick={() => updateStatus.mutate({ id: r.id, status: 'approved' })}
-                    className="flex items-center gap-0.5 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md shrink-0"
-                  >
-                    <Check className="w-3.5 h-3.5" />승인
-                  </button>
-                )}
-                {r.status !== 'rejected' && (
-                  <button
-                    onClick={() => updateStatus.mutate({ id: r.id, status: 'rejected' })}
-                    className="flex items-center gap-0.5 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" />반려
-                  </button>
-                )}
+        <div className="flex flex-col gap-3">
+          {/* 상태별 서브탭 (세그먼트) */}
+          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+            {REQ_TABS.map((s) => {
+              const active = reqTab === s;
+              return (
                 <button
-                  onClick={() => setDeletingId(r.id)}
-                  className="text-gray-300 hover:text-red-500 shrink-0"
-                  aria-label="삭제"
+                  key={s}
+                  onClick={() => setReqTab(s)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    active ? `bg-white shadow-sm ${STATUS_ACTIVE_TEXT[s]}` : 'text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {STATUS_LABEL[s]}
+                  <span
+                    className={`min-w-4.5 px-1 text-center rounded-full text-[11px] font-bold ${
+                      active ? STATUS_COUNT_BADGE[s] : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {reqCounts[s]}
+                  </span>
                 </button>
-              </div>
-            ))
-          )}
-        </section>
+              );
+            })}
+          </div>
+
+          <section className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+            {filteredRequests.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-10">{STATUS_EMPTY[reqTab]}</p>
+            ) : (
+              filteredRequests.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50/70 transition-colors"
+                >
+                  {/* 신청자 아바타 */}
+                  <div
+                    className={`flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold shrink-0 ${STATUS_AVATAR[r.status]}`}
+                  >
+                    {(r.employeeName || '?').charAt(0)}
+                  </div>
+                  {/* 신청자 + 기간 + 사유 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800 truncate">
+                        {r.employeeName || '-'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[11px] font-bold shrink-0">
+                        {r.days}일
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-gray-500 truncate">
+                      {r.startDate}
+                      {r.endDate !== r.startDate ? ` ~ ${r.endDate}` : ''}
+                      {r.reason ? ` · ${r.reason}` : ''}
+                    </div>
+                  </div>
+                  {/* 액션 */}
+                  {r.status !== 'approved' && (
+                    <button
+                      onClick={() => updateStatus.mutate({ id: r.id, status: 'approved' })}
+                      className="flex items-center gap-0.5 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md shrink-0"
+                    >
+                      <Check className="w-3.5 h-3.5" />승인
+                    </button>
+                  )}
+                  {r.status !== 'rejected' && (
+                    <button
+                      onClick={() => updateStatus.mutate({ id: r.id, status: 'rejected' })}
+                      className="flex items-center gap-0.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />반려
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setDeletingId(r.id)}
+                    className="text-gray-300 hover:text-red-500 shrink-0"
+                    aria-label="삭제"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </section>
+        </div>
       )}
 
       <ConfirmModal

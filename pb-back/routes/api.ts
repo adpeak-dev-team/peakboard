@@ -1,5 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql_con } from '../lib/db.js';
+import { requireAuth } from '../lib/auth.js';
+import authRoutes from './api/auth.js';
+import usersRoutes from './api/users.js';
 import boardRoutes from './api/boards.js';
 import boardItemRoutes from './api/boardItems.js';
 import projectRoutes from './api/projects.js';
@@ -25,13 +28,21 @@ const apiRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  await fastify.register(boardRoutes);
-  await fastify.register(projectRoutes);
-  await fastify.register(boardItemRoutes);
-  await fastify.register(eventRoutes);
-  await fastify.register(employeeRoutes);
-  await fastify.register(leaveRoutes);
-  await fastify.register(columnOptionRoutes);
+  // 공개: 인증 라우터 (로그인/회원가입/로그아웃/me/비번변경)
+  await fastify.register(authRoutes);
+
+  // 보호: 로그인 필요한 나머지 API (별도 캡슐화로 preHandler 적용)
+  await fastify.register(async (protectedApp) => {
+    protectedApp.addHook('preHandler', requireAuth);
+    await protectedApp.register(usersRoutes);
+    await protectedApp.register(boardRoutes);
+    await protectedApp.register(projectRoutes);
+    await protectedApp.register(boardItemRoutes);
+    await protectedApp.register(eventRoutes);
+    await protectedApp.register(employeeRoutes);
+    await protectedApp.register(leaveRoutes);
+    await protectedApp.register(columnOptionRoutes);
+  });
 };
 
 export default apiRoutes;

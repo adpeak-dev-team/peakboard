@@ -119,6 +119,7 @@ export interface EmployeeDTO {
   position: string;
   email: string;
   phone: string;
+  avatar: string | null; // 프로필 이미지 (base64 data URL)
   hireDate: string | null; // 입사일 'YYYY-MM-DD'
   leaveTotal: number; // 연 연차 부여 일수
 }

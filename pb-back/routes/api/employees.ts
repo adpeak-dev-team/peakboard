@@ -9,6 +9,7 @@ interface EmployeeRow extends RowDataPacket {
   position: string;
   email: string;
   phone: string;
+  avatar: string | null;
   hire_date: string | null;
   leave_total: number;
 }
@@ -20,6 +21,7 @@ export interface EmployeeDTO {
   position: string;
   email: string;
   phone: string;
+  avatar: string | null;
   hireDate: string | null;
   leaveTotal: number;
 }
@@ -32,13 +34,14 @@ function toEmployeeDTO(row: EmployeeRow): EmployeeDTO {
     position: row.position,
     email: row.email,
     phone: row.phone,
+    avatar: row.avatar ?? null,
     hireDate: row.hire_date,
     leaveTotal: Number(row.leave_total ?? 0),
   };
 }
 
 const SELECT_COLS =
-  "id, name, department, position, email, phone, DATE_FORMAT(hire_date, '%Y-%m-%d') AS hire_date, leave_total";
+  "id, name, department, position, email, phone, avatar, DATE_FORMAT(hire_date, '%Y-%m-%d') AS hire_date, leave_total";
 
 // 부분 업데이트 가능한 필드
 const FIELDS = ['name', 'department', 'position', 'email', 'phone'] as const;

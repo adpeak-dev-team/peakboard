@@ -109,6 +109,7 @@ CREATE TABLE employees (
   position    VARCHAR(50)     NOT NULL DEFAULT '',
   email       VARCHAR(255)    NOT NULL DEFAULT '',
   phone       VARCHAR(50)     NOT NULL DEFAULT '',
+  avatar      LONGTEXT            NULL,
   hire_date   DATE                NULL,
   leave_total INT             NOT NULL DEFAULT 15,
   created_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -155,4 +156,22 @@ CREATE TABLE company_events (
                               ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   KEY idx_company_events_date (event_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 로그인 계정 (회원가입/로그인). employee_id 로 HR 직원과 연결.
+CREATE TABLE users (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  email         VARCHAR(255)    NOT NULL,
+  name          VARCHAR(100)    NOT NULL,
+  password_hash VARCHAR(255)        NULL,
+  role          ENUM('admin','member') NOT NULL DEFAULT 'member',
+  employee_id   BIGINT UNSIGNED     NULL,
+  created_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_users_email (email),
+  KEY idx_users_employee (employee_id),
+  CONSTRAINT fk_users_employee
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

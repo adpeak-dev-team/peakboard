@@ -23,6 +23,7 @@ interface AppShellProps {
   onSelectBoard: (id: string) => void;
   counts: Record<string, number>;
   header: React.ReactNode;
+  isAdmin: boolean;
   children: React.ReactNode;
 }
 
@@ -34,6 +35,7 @@ export default function AppShell({
   onSelectBoard,
   counts,
   header,
+  isAdmin,
   children,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 슬라이드
@@ -76,41 +78,45 @@ export default function AppShell({
           <span className="truncate">홈</span>
         </button>
 
-        <p className="px-3 pt-6 pb-1 text-xs uppercase tracking-wider text-gray-500">관리자</p>
-        <button
-          onClick={() => {
-            onNavChange('members');
-            setSidebarOpen(false);
-          }}
-          className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
-            ${nav === 'members' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
-        >
-          <Users className="w-4 h-4 mr-2 shrink-0" />
-          <span className="truncate">회원관리</span>
-        </button>
-        <button
-          onClick={() => {
-            onNavChange('leave');
-            setSidebarOpen(false);
-          }}
-          className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
-            ${nav === 'leave' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
-        >
-          <CalendarCheck className="w-4 h-4 mr-2 shrink-0" />
-          <span className="truncate">연차관리</span>
-        </button>
-        <button
-          onClick={() => {
-            onNavChange('schedule');
-            setSidebarOpen(false);
-          }}
-          className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
-            ${nav === 'schedule' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
-        >
-          <CalendarDays className="w-4 h-4 mr-2 shrink-0" />
-          <span className="truncate">일정관리</span>
-        </button>
-        
+        {isAdmin && (
+          <>
+            <p className="px-3 pt-6 pb-1 text-xs uppercase tracking-wider text-gray-500">관리자</p>
+            <button
+              onClick={() => {
+                onNavChange('members');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
+                ${nav === 'members' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
+            >
+              <Users className="w-4 h-4 mr-2 shrink-0" />
+              <span className="truncate">회원관리</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavChange('leave');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
+                ${nav === 'leave' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
+            >
+              <CalendarCheck className="w-4 h-4 mr-2 shrink-0" />
+              <span className="truncate">연차관리</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavChange('schedule');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left
+                ${nav === 'schedule' ? 'bg-gray-800 text-white' : 'hover:bg-gray-800 hover:text-white'}`}
+            >
+              <CalendarDays className="w-4 h-4 mr-2 shrink-0" />
+              <span className="truncate">일정관리</span>
+            </button>
+          </>
+        )}
+
 
         <p className="px-3 pt-6 pb-1 text-xs uppercase tracking-wider text-gray-500">작업</p>
         {boards.length === 0 ? (
