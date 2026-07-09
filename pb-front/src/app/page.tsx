@@ -64,13 +64,6 @@ export default function PeakBoard() {
     if (activeBoardId) sessionStorage.setItem(BOARD_SESSION_KEY, activeBoardId);
   }, [activeBoardId]);
 
-  // 미인증(401/404/네트워크 등 어떤 이유든) → 로그인 페이지로 이동
-  useEffect(() => {
-    if (!authLoading && !user && typeof window !== 'undefined') {
-      window.location.href = '/auth/login';
-    }
-  }, [authLoading, user]);
-
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? null;
 
   const onLogout = async () => {
@@ -81,8 +74,8 @@ export default function PeakBoard() {
     }
   };
 
-  // 인증 확인 중 또는 미인증(로그인으로 리다이렉트 중) → 빈 화면 대신 로더
-  if (authLoading || !user) {
+  // 인증 확인 중 → 로더
+  if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center text-sm text-gray-400">
         불러오는 중…
@@ -135,33 +128,44 @@ export default function PeakBoard() {
             : '일정관리'}
         </h1>
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setMyPageOpen(true)}
-            title="마이페이지"
-            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <span className="w-8 h-8 rounded-full overflow-hidden bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-              {me?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={me.avatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                (user.name || user.email || '?').charAt(0)
-              )}
-            </span>
-            <span className="text-right leading-tight hidden sm:block">
-              <span className="block text-sm font-semibold text-gray-800">{user.name}</span>
-              <span className="block text-[11px] text-gray-400">
-                {[me?.department, isAdmin ? '관리자' : null].filter(Boolean).join(' · ') || '일반'}
-              </span>
-            </span>
-          </button>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50 hover:text-gray-700"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            로그아웃
-          </button>
+          {user ? (
+            <>
+              <button
+                onClick={() => setMyPageOpen(true)}
+                title="마이페이지"
+                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <span className="w-8 h-8 rounded-full overflow-hidden bg-linear-to-br from-indigo-400 to-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
+                  {me?.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={me.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (user.name || user.email || '?').charAt(0)
+                  )}
+                </span>
+                <span className="text-right leading-tight hidden sm:block">
+                  <span className="block text-sm font-semibold text-gray-800">{user.name}</span>
+                  <span className="block text-[11px] text-gray-400">
+                    {[me?.department, isAdmin ? '관리자' : null].filter(Boolean).join(' · ') || '일반'}
+                  </span>
+                </span>
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-50 hover:text-gray-700"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <a
+              href="/auth/login"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-50"
+            >
+              로그인
+            </a>
+          )}
         </div>
       </div>
     );
@@ -198,7 +202,7 @@ export default function PeakBoard() {
         <div className="text-sm text-gray-400 py-10 text-center">보드가 없습니다.</div>
       )}
     </AppShell>
-    {myPageOpen && <MyPageModal user={user} onClose={() => setMyPageOpen(false)} />}
+    {myPageOpen && user && <MyPageModal user={user} onClose={() => setMyPageOpen(false)} />}
     </>
   );
 }
