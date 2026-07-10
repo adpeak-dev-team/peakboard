@@ -5,6 +5,7 @@ import cors from '@fastify/cors';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import apiRoutes from './routes/api.js';
+import { ensureDevAuthUser } from './lib/auth.js';
 
 const app = fastify({ logger: true });
 
@@ -35,6 +36,7 @@ app.get('/chkserver', async (request, reply) => {
 
 const start = async () => {
   try {
+    await ensureDevAuthUser((msg) => app.log.info(msg));
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`server running in port ${port}`);
   } catch (err) {

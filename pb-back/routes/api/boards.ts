@@ -26,6 +26,16 @@ function toBoardDTO(row: BoardRow): BoardDTO {
 }
 
 const boardRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/test_get', async (request, reply) => {
+    try {
+      const [rows] = await sql_con.promise().query('SELECT * FROM boards');
+      return { ok: true, count: (rows as unknown[]).length, rows };
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(500).send({ ok: false, error: (err as Error).message });
+    }
+  });
+
   fastify.get('/boards', async (request, reply) => {
     try {
       const [rows] = await sql_con

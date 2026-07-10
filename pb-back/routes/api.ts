@@ -10,6 +10,7 @@ import eventRoutes from './api/events.js';
 import employeeRoutes from './api/employees.js';
 import leaveRoutes from './api/leave.js';
 import columnOptionRoutes from './api/columnOptions.js';
+import nworkRoutes from './api/yong/nwork.js';
 
 const apiRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/test', async () => {
@@ -30,6 +31,9 @@ const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // 공개: 인증 라우터 (로그인/회원가입/로그아웃/me/비번변경)
   await fastify.register(authRoutes);
+
+  // 개인 어드민(yong) — 공개 자리에 두었으니 필요 시 requireAuth 블록으로 옮길 것
+  await fastify.register(nworkRoutes, { prefix: '/yong/nwork' });
 
   // 보호: 로그인 필요한 나머지 API (별도 캡슐화로 preHandler 적용)
   await fastify.register(async (protectedApp) => {
