@@ -1,29 +1,11 @@
 services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: "rkwkrh13!#"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./pb-back/lib/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prkwkrh13!#"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+  # mysql 은 원격 DB 로 이관되어 컨테이너로 띄우지 않음.
+  # 볼륨 선언(mysql_data)은 하단에 유지해 기존 데이터가 삭제되지 않도록 둔다.
 
   backend:
     build: ./pb-back
-    environment:
-      HOST: mysql
-      DBPWD: "rkwkrh13!#"
-      SHEMA: peakboard
-      PORT: 3050
-      COOKIE_SECRET: "peakboard-prod-cookie-secret-change-me"
-    depends_on:
-      mysql:
-        condition: service_healthy
+    env_file:
+      - ./pb-back/.env
 
   frontend:
     build: ./pb-front
