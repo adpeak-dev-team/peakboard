@@ -21,6 +21,36 @@ const nworkRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  fastify.patch<{ Body: { idxs?: number[]; n_status?: string } }>(
+    '/bulk-status',
+    async (request, reply) => {
+      const b = request.body ?? {};
+      const idxs = Array.isArray(b.idxs)
+        ? b.idxs.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+        : [];
+      const status = typeof b.n_status === 'string' ? b.n_status.trim().slice(0, 50) : '';
+      if (idxs.length === 0) {
+        return reply.status(400).send({ resultMessage: '대상이 없습니다' });
+      }
+      if (!status) {
+        return reply.status(400).send({ resultMessage: 'n_status 비어있음' });
+      }
+      try {
+        const placeholders = idxs.map(() => '?').join(', ');
+        const [result] = await sql_con
+          .promise()
+          .query(
+            `UPDATE nwork SET n_status = ? WHERE n_idx IN (${placeholders})`,
+            [status, ...idxs]
+          );
+        return { updated: (result as { affectedRows?: number }).affectedRows ?? 0 };
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.status(500).send({ resultMessage: (err as Error).message });
+      }
+    }
+  );
+
   fastify.patch<{ Params: { idx: string }; Body: UpdateBody }>(
     '/:idx',
     async (request, reply) => {

@@ -6,6 +6,7 @@ import { Check, Pencil, Search, X } from 'lucide-react';
 import {
     fetchNworkList,
     updateNwork,
+    bulkUpdateStatus,
     type NworkPatch,
     type NworkRow,
 } from '@/services/yong/nwork';
@@ -28,6 +29,7 @@ const STATUS_PRESETS = [
     '최적화',
     '최적화의심',
     '카페',
+    '밴드사용',
 ];
 
 type EditTarget =
@@ -61,8 +63,11 @@ export default function NworkPage() {
     });
 
     const [query, setQuery] = useState('');
-    const [status, setStatus] = useState<string>(STATUS_ALL);
+    const [status, setStatus] = useState<string>('사용가능');
     const [editing, setEditing] = useState<EditTarget | null>(null);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [bulkStatus, setBulkStatus] = useState<string>(STATUS_PRESETS[0]);
+    const [bulkCustom, setBulkCustom] = useState<string>('');
 
     const mutation = useMutation({
         mutationFn: ({ idx, patch }: { idx: number; patch: NworkPatch }) =>
@@ -73,6 +78,19 @@ export default function NworkPage() {
         },
         onError: (e) => {
             alert('저장 실패: ' + (e as Error).message);
+        },
+    });
+
+    const bulkMutation = useMutation({
+        mutationFn: ({ idxs, n_status }: { idxs: number[]; n_status: string }) =>
+            bulkUpdateStatus(idxs, n_status),
+        onSuccess: (res) => {
+            qc.invalidateQueries({ queryKey: ['yong', 'nwork'] });
+            setSelected(new Set());
+            alert(`${res.updated}건 상태 변경 완료`);
+        },
+        onError: (e) => {
+            alert('일괄 변경 실패: ' + (e as Error).message);
         },
     });
 
@@ -104,6 +122,48 @@ export default function NworkPage() {
 
     const isEditing = (idx: number, field: EditTarget['field']) =>
         editing?.idx === idx && editing.field === field;
+
+    const visibleIdxs = useMemo(() => rows.map((r) => r.n_idx), [rows]);
+    const selectedVisibleCount = useMemo(
+        () => visibleIdxs.filter((idx) => selected.has(idx)).length,
+        [visibleIdxs, selected]
+    );
+    const allVisibleSelected =
+        visibleIdxs.length > 0 && selectedVisibleCount === visibleIdxs.length;
+
+    const toggleOne = (idx: number) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(idx)) next.delete(idx);
+            else next.add(idx);
+            return next;
+        });
+    };
+
+    const toggleAll = () => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (allVisibleSelected) {
+                visibleIdxs.forEach((idx) => next.delete(idx));
+            } else {
+                visibleIdxs.forEach((idx) => next.add(idx));
+            }
+            return next;
+        });
+    };
+
+    const bulkIsCustom = bulkStatus === STATUS_CUSTOM;
+    const bulkFinalValue = bulkIsCustom ? bulkCustom.trim() : bulkStatus;
+
+    const applyBulk = () => {
+        const idxs = [...selected];
+        if (idxs.length === 0) return;
+        if (!bulkFinalValue) return;
+        if (!confirm(`${idxs.length}건의 상태를 "${bulkFinalValue}"(으)로 변경할까요?`)) {
+            return;
+        }
+        bulkMutation.mutate({ idxs, n_status: bulkFinalValue });
+    };
 
     return (
         <div className="space-y-4">
@@ -150,11 +210,61 @@ export default function NworkPage() {
                 </div>
             </div>
 
+            {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs rounded border border-emerald-800/60 bg-emerald-900/10 px-3 py-2">
+                    <span className="text-emerald-300">{selected.size}건 선택됨</span>
+                    <span className="text-neutral-500">→</span>
+                    <select
+                        value={bulkStatus}
+                        onChange={(e) => setBulkStatus(e.target.value)}
+                        className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-200 outline-none focus:border-emerald-500/60"
+                    >
+                        {STATUS_PRESETS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                        ))}
+                        <option value={STATUS_CUSTOM}>{STATUS_CUSTOM}</option>
+                    </select>
+                    {bulkIsCustom && (
+                        <input
+                            value={bulkCustom}
+                            onChange={(e) => setBulkCustom(e.target.value)}
+                            placeholder="직접 입력"
+                            className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-200 outline-none focus:border-emerald-500/60"
+                        />
+                    )}
+                    <button
+                        type="button"
+                        onClick={applyBulk}
+                        disabled={bulkMutation.isPending || !bulkFinalValue}
+                        className="px-2.5 py-1 rounded bg-emerald-600/80 hover:bg-emerald-600 text-white disabled:opacity-40"
+                    >
+                        {bulkMutation.isPending ? '적용 중…' : '일괄 변경'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelected(new Set())}
+                        className="px-2 py-1 rounded border border-neutral-700 text-neutral-400 hover:bg-neutral-800"
+                    >
+                        선택 해제
+                    </button>
+                </div>
+            )}
+
             <div className="rounded border border-neutral-800 overflow-hidden">
                 <div className="overflow-auto max-h-[calc(100vh-16rem)]">
                     <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-neutral-900 text-neutral-400">
                             <tr>
+                                <th className="w-8 px-3 py-2 border-b border-neutral-800">
+                                    <input
+                                        type="checkbox"
+                                        checked={allVisibleSelected}
+                                        onChange={toggleAll}
+                                        disabled={visibleIdxs.length === 0}
+                                        className="accent-emerald-500 cursor-pointer"
+                                        title="전체 선택"
+                                    />
+                                </th>
                                 {COLUMNS.map((c) => (
                                     <th
                                         key={String(c.key)}
@@ -168,19 +278,19 @@ export default function NworkPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-neutral-500">
+                                    <td colSpan={COLUMNS.length + 1} className="px-3 py-6 text-center text-neutral-500">
                                         불러오는 중…
                                     </td>
                                 </tr>
                             ) : error ? (
                                 <tr>
-                                    <td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-red-400">
+                                    <td colSpan={COLUMNS.length + 1} className="px-3 py-6 text-center text-red-400">
                                         로드 실패: {(error as Error).message}
                                     </td>
                                 </tr>
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-neutral-500">
+                                    <td colSpan={COLUMNS.length + 1} className="px-3 py-6 text-center text-neutral-500">
                                         결과 없음
                                     </td>
                                 </tr>
@@ -190,6 +300,14 @@ export default function NworkPage() {
                                         key={r.n_idx ?? i}
                                         className="odd:bg-neutral-950 even:bg-neutral-900/40 hover:bg-neutral-800/60"
                                     >
+                                        <td className="px-3 py-1.5 border-b border-neutral-900 align-top">
+                                            <input
+                                                type="checkbox"
+                                                checked={selected.has(r.n_idx)}
+                                                onChange={() => toggleOne(r.n_idx)}
+                                                className="accent-emerald-500 cursor-pointer"
+                                            />
+                                        </td>
                                         {COLUMNS.map((c) => {
                                             const raw = r[c.key];
                                             return (

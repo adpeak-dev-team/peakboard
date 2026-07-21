@@ -26,3 +26,14 @@ export async function updateNwork(idx: number, patch: NworkPatch): Promise<Nwork
   const { data } = await apiClient.patch<NworkRow>(`/yong/nwork/${idx}`, patch);
   return data;
 }
+
+export async function bulkUpdateStatus(
+  idxs: number[],
+  n_status: string
+): Promise<{ updated: number }> {
+  const { data } = await apiClient.patch<{ updated: number }>(
+    '/yong/nwork/bulk-status',
+    { idxs, n_status }
+  );
+  return data;
+}
